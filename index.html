@@ -111,6 +111,10 @@
   .btn-icon{background:var(--surface-2);color:var(--muted);border:1px solid var(--line);border-radius:8px;width:28px;height:28px;font-size:14px;padding:0;flex-shrink:0}
   .lib-section-btn{background:var(--surface-2);color:var(--accent);border:1px solid var(--line);width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:12.5px}
   .lib-section-btn .cnt{color:var(--muted);font-family:var(--mono);margin-left:auto;margin-right:8px}
+  .stats-status{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:11.5px;color:var(--muted)}
+  .prob-badge{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:5px;margin-left:6px}
+  .prob-badge.fav{background:rgba(199,255,107,0.15);color:var(--accent)}
+  .prob-badge.dog{background:rgba(255,122,99,0.12);color:var(--warn)}
 </style>
 </head>
 <body>
@@ -145,6 +149,14 @@
       <select id="tSurface"><option value="hard">Hard</option><option value="clay">Clay</option><option value="grass">Grass</option></select>
     </div>
   </div>
+  <div class="row" style="margin-top:8px">
+    <div><label data-i18n="tour">Тур</label>
+      <select id="tTour"><option value="atp">ATP</option><option value="wta">WTA</option></select>
+    </div>
+    <div><label data-i18n="statsStatus">Статистика</label>
+      <div id="statsStatus" class="stats-status" data-i18n="statsNotLoaded">Не загружена</div>
+    </div>
+  </div>
   <label style="margin-top:10px" data-i18n="drawSize">Размер сетки</label>
   <select id="tSize">
     <option value="16">16</option><option value="28">28</option><option value="32" selected>32</option><option value="64">64</option><option value="128">128</option>
@@ -164,7 +176,7 @@
   <div class="counter"><span data-i18n="selected">Выбрано</span><b id="selCount">0 / 9</b></div>
   <div class="suggest-row">
     <select id="clashThreshold"></select>
-    <button onclick="suggestLineup()" data-i18n="suggestBtn">🎯 Подсказать состав</button>
+    <button id="suggestBtnEl" onclick="suggestLineup()" data-i18n="suggestBtn">🎯 Подсказать состав</button>
   </div>
   <div class="jumprow">
     <input id="jumpBox" type="number" data-i18n-ph="jumpPlaceholder" placeholder="Перейти к позиции №">
@@ -246,16 +258,18 @@ const BASE = {
   suggestSuccess:"Готово: девятка без пересечений раньше выбранного этапа", suggestNeedNine:"Нужно минимум 9 игроков в сетке",
   suggestPartial:(n)=>`Не удалось найти полную девятку без пересечений — подобрано только ${n} из 9. Попробуй более ранний этап.`,
   myLineups:"Составы", clearSelection:"Очистить состав", noTournaments:"Нет сохранённых турниров", noLineups:"Нет сохранённых составов",
-  suggestVariant:"Готово: новый вариант с минимальными изменениями"
+  suggestVariant:"Готово: новый вариант с минимальными изменениями",
+  tour:"Тур", statsStatus:"Статистика", statsNotLoaded:"Не загружена", statsLoading:"Загрузка статистики...",
+  statsFailed:"Не удалось загрузить — используется базовый приоритет", favShort:"фав.", dogShort:"андердог"
 };
 const TR = {
-  uk:{title:"Draw Clash Checker",subtitle:"Перевірка своєї дев'ятки: де по сітці вона перетинається сама з собою.",tournament:"Турнір",name:"Назва",surface:"Покриття",drawSize:"Розмір сітки",howTo:"Як отримати JSON?",jsonLabel:"JSON сітки",importBtn:"Імпортувати сітку",selection:"Вибір дев'ятки",selected:"Обрано",fullDraw:"Повна сітка",early:"Рання зустріч",mid:"Середній раунд",late:"Пізня зустріч",lineupResults:"Дев'ятка і перетини",disclaimer:"Лише структурний факт можливої зустрічі.",noData:"немає даних",copied:"Скопійовано",credit:"Створено Huntsman",myTournaments:"Мої турніри",libraryEmpty:"Поки немає збережених турнірів",saveToLibrary:"Зберегти в бібліотеку",enterName:"Спочатку введи назву турніру",swapHint:"Натисни ⇄ біля гравця, потім обери заміну у списку вище.",compareTitle:"Порівняння складів",saveAsA:"Запам'ятати як A",saveAsB:"Запам'ятати як B",onlyIn:"Лише в",both:"В обох",needNine:"Спочатку обери 9 гравців",confirmDelete:"Видалити цей турнір?",saveLibA:"💾 A в бібліотеку",saveLibB:"💾 B в бібліотеку",nameForVariant:"Назва для цього варіанту",savedToLibrary:"Збережено в бібліотеку",jumpPlaceholder:"Перейти до позиції №",jumpBtn:"Перейти",viewFlat:"Список",viewBracket:"По сітці",upperHalf:"Верхня половина сітки",lowerHalf:"Нижня половина сітки",notFound:"Позицію не знайдено",suggestBtn:"🎯 Підказати склад",noEarlierThan:"Не раніше",noClashAtAll:"Зовсім без перетинів",suggestSuccess:"Готово: дев'ятка без перетинів раніше обраного етапу",suggestNeedNine:"Потрібно мінімум 9 гравців у сітці",suggestPartial:(n)=>`Не вдалося знайти повну дев'ятку без перетинів — підібрано лише ${n} з 9. Спробуй раніший етап.`,myLineups:"Склади",clearSelection:"Очистити склад",noTournaments:"Немає збережених турнірів",noLineups:"Немає збережених складів",suggestVariant:"Готово: новий варіант із мінімальними змінами"},
-  en:{title:"Draw Clash Checker",subtitle:"Check your lineup of nine: where it clashes with itself across the draw.",tournament:"Tournament",name:"Name",surface:"Surface",drawSize:"Draw size",howTo:"How to get the JSON?",jsonLabel:"Draw JSON",importBtn:"Import draw",selection:"Select your nine",selected:"Selected",fullDraw:"Full draw",early:"Early clash",mid:"Mid round",late:"Late clash",lineupResults:"Lineup and clashes",disclaimer:"Only the structural fact of a possible clash.",noData:"no data",copied:"Copied",credit:"Created by Huntsman",myTournaments:"My tournaments",libraryEmpty:"No saved tournaments yet",saveToLibrary:"Save to library",enterName:"Enter a tournament name first",swapHint:"Tap ⇄ next to a player, then pick a replacement above.",compareTitle:"Compare lineups",saveAsA:"Save as A",saveAsB:"Save as B",onlyIn:"Only in",both:"In both",needNine:"Select 9 players first",confirmDelete:"Delete this tournament?",saveLibA:"💾 Save A to library",saveLibB:"💾 Save B to library",nameForVariant:"Name for this variant",savedToLibrary:"Saved to library",jumpPlaceholder:"Jump to position #",jumpBtn:"Go",viewFlat:"List",viewBracket:"By bracket",upperHalf:"Upper half of the draw",lowerHalf:"Lower half of the draw",notFound:"Position not found",suggestBtn:"🎯 Suggest lineup",noEarlierThan:"Not before",noClashAtAll:"No clashes at all",suggestSuccess:"Done: a lineup with no clashes before the chosen stage",suggestNeedNine:"Need at least 9 players in the draw",suggestPartial:(n)=>`Could not find a full lineup of nine — only found ${n} of 9. Try an earlier stage.`,myLineups:"Lineups",clearSelection:"Clear lineup",noTournaments:"No saved tournaments",noLineups:"No saved lineups",suggestVariant:"Done: a new variant with minimal changes"},
-  fr:{title:"Draw Clash Checker",subtitle:"Vérifiez votre équipe de neuf : où elle se croise elle-même dans le tableau.",tournament:"Tournoi",name:"Nom",surface:"Surface",drawSize:"Taille du tableau",howTo:"Comment obtenir le JSON ?",jsonLabel:"JSON du tableau",importBtn:"Importer le tableau",selection:"Sélection des neuf",selected:"Sélectionnés",fullDraw:"Tableau complet",early:"Croisement précoce",mid:"Tour intermédiaire",late:"Croisement tardif",lineupResults:"Équipe et croisements",disclaimer:"Uniquement le fait structurel d'un croisement possible.",noData:"aucune donnée",copied:"Copié",credit:"Créé par Huntsman",myTournaments:"Mes tournois",libraryEmpty:"Aucun tournoi enregistré",saveToLibrary:"Enregistrer",enterName:"Indique d'abord un nom",swapHint:"Touchez ⇄ à côté d'un joueur, puis choisissez un remplaçant.",compareTitle:"Comparer les équipes",saveAsA:"Enregistrer comme A",saveAsB:"Enregistrer comme B",onlyIn:"Seulement dans",both:"Dans les deux",needNine:"Sélectionne d'abord 9 joueurs",confirmDelete:"Supprimer ce tournoi ?",saveLibA:"💾 Enregistrer A",saveLibB:"💾 Enregistrer B",nameForVariant:"Nom de cette variante",savedToLibrary:"Enregistré",jumpPlaceholder:"Aller à la position n°",jumpBtn:"Aller",viewFlat:"Liste",viewBracket:"Par tableau",upperHalf:"Moitié supérieure du tableau",lowerHalf:"Moitié inférieure du tableau",notFound:"Position introuvable",suggestBtn:"🎯 Suggérer une équipe",noEarlierThan:"Pas avant",noClashAtAll:"Aucun croisement du tout",suggestSuccess:"Terminé : équipe sans croisement avant le stade choisi",suggestNeedNine:"Il faut au moins 9 joueurs dans le tableau",suggestPartial:(n)=>`Impossible de trouver une équipe complète de neuf — seulement ${n} sur 9 trouvés. Essaie un stade plus précoce.`,myLineups:"Équipes",clearSelection:"Effacer l'équipe",noTournaments:"Aucun tournoi enregistré",noLineups:"Aucune équipe enregistrée",suggestVariant:"Terminé : une nouvelle variante avec des changements minimes"},
-  de:{title:"Draw Clash Checker",subtitle:"Prüfe dein Neunerteam: wo es sich im Raster selbst kreuzt.",tournament:"Turnier",name:"Name",surface:"Belag",drawSize:"Rastergröße",howTo:"Wie bekomme ich das JSON?",jsonLabel:"Raster-JSON",importBtn:"Raster importieren",selection:"Neunerauswahl",selected:"Ausgewählt",fullDraw:"Vollständiges Raster",early:"Frühe Begegnung",mid:"Mittlere Runde",late:"Späte Begegnung",lineupResults:"Team und Begegnungen",disclaimer:"Nur die strukturelle Tatsache einer möglichen Begegnung.",noData:"keine Daten",copied:"Kopiert",credit:"Erstellt von Huntsman",myTournaments:"Meine Turniere",libraryEmpty:"Noch keine gespeicherten Turniere",saveToLibrary:"Speichern",enterName:"Zuerst einen Namen eingeben",swapHint:"Tippe auf ⇄ neben einem Spieler, dann wähle einen Ersatz.",compareTitle:"Teams vergleichen",saveAsA:"Als A speichern",saveAsB:"Als B speichern",onlyIn:"Nur in",both:"In beiden",needNine:"Wähle zuerst 9 Spieler",confirmDelete:"Dieses Turnier löschen?",saveLibA:"💾 A speichern",saveLibB:"💾 B speichern",nameForVariant:"Name für diese Variante",savedToLibrary:"Gespeichert",jumpPlaceholder:"Zu Position Nr. springen",jumpBtn:"Los",viewFlat:"Liste",viewBracket:"Nach Raster",upperHalf:"Obere Rasterhälfte",lowerHalf:"Untere Rasterhälfte",notFound:"Position nicht gefunden",suggestBtn:"🎯 Team vorschlagen",noEarlierThan:"Nicht vor",noClashAtAll:"Gar keine Begegnung",suggestSuccess:"Fertig: Team ohne Begegnung vor der gewählten Runde",suggestNeedNine:"Mindestens 9 Spieler im Raster nötig",suggestPartial:(n)=>`Kein vollständiges Neunerteam gefunden — nur ${n} von 9. Versuche eine frühere Runde.`,myLineups:"Teams",clearSelection:"Team leeren",noTournaments:"Keine gespeicherten Turniere",noLineups:"Keine gespeicherten Teams",suggestVariant:"Fertig: eine neue Variante mit minimalen Änderungen"},
-  es:{title:"Draw Clash Checker",subtitle:"Comprueba tu equipo de nueve: dónde se cruza consigo mismo en el cuadro.",tournament:"Torneo",name:"Nombre",surface:"Superficie",drawSize:"Tamaño del cuadro",howTo:"¿Cómo obtener el JSON?",jsonLabel:"JSON del cuadro",importBtn:"Importar cuadro",selection:"Selección de los nueve",selected:"Seleccionados",fullDraw:"Cuadro completo",early:"Cruce temprano",mid:"Ronda intermedia",late:"Cruce tardío",lineupResults:"Equipo y cruces",disclaimer:"Solo el hecho estructural de un posible cruce.",noData:"sin datos",copied:"Copiado",credit:"Creado por Huntsman",myTournaments:"Mis torneos",libraryEmpty:"Aún no hay torneos guardados",saveToLibrary:"Guardar",enterName:"Introduce un nombre primero",swapHint:"Toca ⇄ junto a un jugador y elige un reemplazo.",compareTitle:"Comparar equipos",saveAsA:"Guardar como A",saveAsB:"Guardar como B",onlyIn:"Solo en",both:"En ambos",needNine:"Selecciona primero 9 jugadores",confirmDelete:"¿Eliminar este torneo?",saveLibA:"💾 Guardar A",saveLibB:"💾 Guardar B",nameForVariant:"Nombre para esta variante",savedToLibrary:"Guardado",jumpPlaceholder:"Ir a la posición n.°",jumpBtn:"Ir",viewFlat:"Lista",viewBracket:"Por cuadro",upperHalf:"Mitad superior del cuadro",lowerHalf:"Mitad inferior del cuadro",notFound:"Posición no encontrada",suggestBtn:"🎯 Sugerir equipo",noEarlierThan:"No antes de",noClashAtAll:"Sin cruces en absoluto",suggestSuccess:"Listo: equipo sin cruces antes de la etapa elegida",suggestNeedNine:"Se necesitan al menos 9 jugadores en el cuadro",suggestPartial:(n)=>`No se encontró un equipo completo de nueve — solo ${n} de 9. Prueba una etapa anterior.`,myLineups:"Equipos",clearSelection:"Vaciar equipo",noTournaments:"No hay torneos guardados",noLineups:"No hay equipos guardados",suggestVariant:"Listo: una nueva variante con cambios mínimos"},
-  it:{title:"Draw Clash Checker",subtitle:"Controlla la tua squadra di nove: dove si incrocia con sé stessa nel tabellone.",tournament:"Torneo",name:"Nome",surface:"Superficie",drawSize:"Dimensione tabellone",howTo:"Come ottenere il JSON?",jsonLabel:"JSON del tabellone",importBtn:"Importa tabellone",selection:"Selezione dei nove",selected:"Selezionati",fullDraw:"Tabellone completo",early:"Incrocio precoce",mid:"Turno intermedio",late:"Incrocio tardivo",lineupResults:"Squadra e incroci",disclaimer:"Solo il fatto strutturale di un possibile incrocio.",noData:"nessun dato",copied:"Copiato",credit:"Creato da Huntsman",myTournaments:"I miei tornei",libraryEmpty:"Nessun torneo salvato",saveToLibrary:"Salva",enterName:"Inserisci prima un nome",swapHint:"Tocca ⇄ accanto a un giocatore, poi scegli un sostituto.",compareTitle:"Confronta squadre",saveAsA:"Salva come A",saveAsB:"Salva come B",onlyIn:"Solo in",both:"In entrambi",needNine:"Seleziona prima 9 giocatori",confirmDelete:"Eliminare questo torneo?",saveLibA:"💾 Salva A",saveLibB:"💾 Salva B",nameForVariant:"Nome per questa variante",savedToLibrary:"Salvato",jumpPlaceholder:"Vai alla posizione n.",jumpBtn:"Vai",viewFlat:"Elenco",viewBracket:"Per tabellone",upperHalf:"Metà superiore del tabellone",lowerHalf:"Metà inferiore del tabellone",notFound:"Posizione non trovata",suggestBtn:"🎯 Suggerisci squadra",noEarlierThan:"Non prima di",noClashAtAll:"Nessun incrocio del tutto",suggestSuccess:"Fatto: squadra senza incroci prima della fase scelta",suggestNeedNine:"Servono almeno 9 giocatori nel tabellone",suggestPartial:(n)=>`Non è stata trovata una squadra completa di nove — solo ${n} su 9. Prova una fase precedente.`,myLineups:"Squadre",clearSelection:"Svuota squadra",noTournaments:"Nessun torneo salvato",noLineups:"Nessuna squadra salvata",suggestVariant:"Fatto: una nuova variante con modifiche minime"},
-  pl:{title:"Draw Clash Checker",subtitle:"Sprawdź swoją dziewiątkę: gdzie krzyżuje się sama ze sobą w drabince.",tournament:"Turniej",name:"Nazwa",surface:"Nawierzchnia",drawSize:"Rozmiar drabinki",howTo:"Jak uzyskać JSON?",jsonLabel:"JSON drabinki",importBtn:"Importuj drabinkę",selection:"Wybór dziewiątki",selected:"Wybrano",fullDraw:"Pełna drabinka",early:"Wczesna kolizja",mid:"Środkowa runda",late:"Późna kolizja",lineupResults:"Skład i kolizje",disclaimer:"Tylko strukturalny fakt możliwej kolizji.",noData:"brak danych",copied:"Skopiowano",credit:"Stworzone przez Huntsman",myTournaments:"Moje turnieje",libraryEmpty:"Brak zapisanych turniejów",saveToLibrary:"Zapisz",enterName:"Najpierw wpisz nazwę",swapHint:"Dotknij ⇄ obok gracza, a potem wybierz zamiennika.",compareTitle:"Porównaj składy",saveAsA:"Zapisz jako A",saveAsB:"Zapisz jako B",onlyIn:"Tylko w",both:"W obu",needNine:"Najpierw wybierz 9 graczy",confirmDelete:"Usunąć ten turniej?",saveLibA:"💾 Zapisz A",saveLibB:"💾 Zapisz B",nameForVariant:"Nazwa dla tego wariantu",savedToLibrary:"Zapisano",jumpPlaceholder:"Przejdź do pozycji nr",jumpBtn:"Przejdź",viewFlat:"Lista",viewBracket:"Wg drabinki",upperHalf:"Górna połowa drabinki",lowerHalf:"Dolna połowa drabinki",notFound:"Nie znaleziono pozycji",suggestBtn:"🎯 Zasugeruj skład",noEarlierThan:"Nie wcześniej niż",noClashAtAll:"Zupełnie bez kolizji",suggestSuccess:"Gotowe: skład bez kolizji przed wybranym etapem",suggestNeedNine:"Potrzeba minimum 9 graczy w drabince",suggestPartial:(n)=>`Nie udało się znaleźć pełnej dziewiątki — dobrano tylko ${n} z 9. Spróbuj wcześniejszy etap.`,myLineups:"Składy",clearSelection:"Wyczyść skład",noTournaments:"Brak zapisanych turniejów",noLineups:"Brak zapisanych składów",suggestVariant:"Gotowe: nowy wariant z minimalnymi zmianami"}
+  uk:{title:"Draw Clash Checker",subtitle:"Перевірка своєї дев'ятки: де по сітці вона перетинається сама з собою.",tournament:"Турнір",name:"Назва",surface:"Покриття",drawSize:"Розмір сітки",howTo:"Як отримати JSON?",jsonLabel:"JSON сітки",importBtn:"Імпортувати сітку",selection:"Вибір дев'ятки",selected:"Обрано",fullDraw:"Повна сітка",early:"Рання зустріч",mid:"Середній раунд",late:"Пізня зустріч",lineupResults:"Дев'ятка і перетини",disclaimer:"Лише структурний факт можливої зустрічі.",noData:"немає даних",copied:"Скопійовано",credit:"Створено Huntsman",myTournaments:"Мої турніри",libraryEmpty:"Поки немає збережених турнірів",saveToLibrary:"Зберегти в бібліотеку",enterName:"Спочатку введи назву турніру",swapHint:"Натисни ⇄ біля гравця, потім обери заміну у списку вище.",compareTitle:"Порівняння складів",saveAsA:"Запам'ятати як A",saveAsB:"Запам'ятати як B",onlyIn:"Лише в",both:"В обох",needNine:"Спочатку обери 9 гравців",confirmDelete:"Видалити цей турнір?",saveLibA:"💾 A в бібліотеку",saveLibB:"💾 B в бібліотеку",nameForVariant:"Назва для цього варіанту",savedToLibrary:"Збережено в бібліотеку",jumpPlaceholder:"Перейти до позиції №",jumpBtn:"Перейти",viewFlat:"Список",viewBracket:"По сітці",upperHalf:"Верхня половина сітки",lowerHalf:"Нижня половина сітки",notFound:"Позицію не знайдено",suggestBtn:"🎯 Підказати склад",noEarlierThan:"Не раніше",noClashAtAll:"Зовсім без перетинів",suggestSuccess:"Готово: дев'ятка без перетинів раніше обраного етапу",suggestNeedNine:"Потрібно мінімум 9 гравців у сітці",suggestPartial:(n)=>`Не вдалося знайти повну дев'ятку без перетинів — підібрано лише ${n} з 9. Спробуй раніший етап.`,myLineups:"Склади",clearSelection:"Очистити склад",noTournaments:"Немає збережених турнірів",noLineups:"Немає збережених складів",suggestVariant:"Готово: новий варіант із мінімальними змінами",tour:"Тур",statsStatus:"Статистика",statsNotLoaded:"Не завантажена",statsLoading:"Завантаження статистики...",statsFailed:"Не вдалося завантажити — використано базовий пріоритет",favShort:"фав.",dogShort:"аутсайдер"},
+  en:{title:"Draw Clash Checker",subtitle:"Check your lineup of nine: where it clashes with itself across the draw.",tournament:"Tournament",name:"Name",surface:"Surface",drawSize:"Draw size",howTo:"How to get the JSON?",jsonLabel:"Draw JSON",importBtn:"Import draw",selection:"Select your nine",selected:"Selected",fullDraw:"Full draw",early:"Early clash",mid:"Mid round",late:"Late clash",lineupResults:"Lineup and clashes",disclaimer:"Only the structural fact of a possible clash.",noData:"no data",copied:"Copied",credit:"Created by Huntsman",myTournaments:"My tournaments",libraryEmpty:"No saved tournaments yet",saveToLibrary:"Save to library",enterName:"Enter a tournament name first",swapHint:"Tap ⇄ next to a player, then pick a replacement above.",compareTitle:"Compare lineups",saveAsA:"Save as A",saveAsB:"Save as B",onlyIn:"Only in",both:"In both",needNine:"Select 9 players first",confirmDelete:"Delete this tournament?",saveLibA:"💾 Save A to library",saveLibB:"💾 Save B to library",nameForVariant:"Name for this variant",savedToLibrary:"Saved to library",jumpPlaceholder:"Jump to position #",jumpBtn:"Go",viewFlat:"List",viewBracket:"By bracket",upperHalf:"Upper half of the draw",lowerHalf:"Lower half of the draw",notFound:"Position not found",suggestBtn:"🎯 Suggest lineup",noEarlierThan:"Not before",noClashAtAll:"No clashes at all",suggestSuccess:"Done: a lineup with no clashes before the chosen stage",suggestNeedNine:"Need at least 9 players in the draw",suggestPartial:(n)=>`Could not find a full lineup of nine — only found ${n} of 9. Try an earlier stage.`,myLineups:"Lineups",clearSelection:"Clear lineup",noTournaments:"No saved tournaments",noLineups:"No saved lineups",suggestVariant:"Done: a new variant with minimal changes",tour:"Tour",statsStatus:"Stats",statsNotLoaded:"Not loaded",statsLoading:"Loading stats...",statsFailed:"Failed to load — using base priority",favShort:"fav.",dogShort:"underdog"},
+  fr:{title:"Draw Clash Checker",subtitle:"Vérifiez votre équipe de neuf : où elle se croise elle-même dans le tableau.",tournament:"Tournoi",name:"Nom",surface:"Surface",drawSize:"Taille du tableau",howTo:"Comment obtenir le JSON ?",jsonLabel:"JSON du tableau",importBtn:"Importer le tableau",selection:"Sélection des neuf",selected:"Sélectionnés",fullDraw:"Tableau complet",early:"Croisement précoce",mid:"Tour intermédiaire",late:"Croisement tardif",lineupResults:"Équipe et croisements",disclaimer:"Uniquement le fait structurel d'un croisement possible.",noData:"aucune donnée",copied:"Copié",credit:"Créé par Huntsman",myTournaments:"Mes tournois",libraryEmpty:"Aucun tournoi enregistré",saveToLibrary:"Enregistrer",enterName:"Indique d'abord un nom",swapHint:"Touchez ⇄ à côté d'un joueur, puis choisissez un remplaçant.",compareTitle:"Comparer les équipes",saveAsA:"Enregistrer comme A",saveAsB:"Enregistrer comme B",onlyIn:"Seulement dans",both:"Dans les deux",needNine:"Sélectionne d'abord 9 joueurs",confirmDelete:"Supprimer ce tournoi ?",saveLibA:"💾 Enregistrer A",saveLibB:"💾 Enregistrer B",nameForVariant:"Nom de cette variante",savedToLibrary:"Enregistré",jumpPlaceholder:"Aller à la position n°",jumpBtn:"Aller",viewFlat:"Liste",viewBracket:"Par tableau",upperHalf:"Moitié supérieure du tableau",lowerHalf:"Moitié inférieure du tableau",notFound:"Position introuvable",suggestBtn:"🎯 Suggérer une équipe",noEarlierThan:"Pas avant",noClashAtAll:"Aucun croisement du tout",suggestSuccess:"Terminé : équipe sans croisement avant le stade choisi",suggestNeedNine:"Il faut au moins 9 joueurs dans le tableau",suggestPartial:(n)=>`Impossible de trouver une équipe complète de neuf — seulement ${n} sur 9 trouvés. Essaie un stade plus précoce.`,myLineups:"Équipes",clearSelection:"Effacer l'équipe",noTournaments:"Aucun tournoi enregistré",noLineups:"Aucune équipe enregistrée",suggestVariant:"Terminé : une nouvelle variante avec des changements minimes",tour:"Circuit",statsStatus:"Statistiques",statsNotLoaded:"Non chargées",statsLoading:"Chargement des statistiques...",statsFailed:"Échec du chargement — priorité de base utilisée",favShort:"fav.",dogShort:"outsider"},
+  de:{title:"Draw Clash Checker",subtitle:"Prüfe dein Neunerteam: wo es sich im Raster selbst kreuzt.",tournament:"Turnier",name:"Name",surface:"Belag",drawSize:"Rastergröße",howTo:"Wie bekomme ich das JSON?",jsonLabel:"Raster-JSON",importBtn:"Raster importieren",selection:"Neunerauswahl",selected:"Ausgewählt",fullDraw:"Vollständiges Raster",early:"Frühe Begegnung",mid:"Mittlere Runde",late:"Späte Begegnung",lineupResults:"Team und Begegnungen",disclaimer:"Nur die strukturelle Tatsache einer möglichen Begegnung.",noData:"keine Daten",copied:"Kopiert",credit:"Erstellt von Huntsman",myTournaments:"Meine Turniere",libraryEmpty:"Noch keine gespeicherten Turniere",saveToLibrary:"Speichern",enterName:"Zuerst einen Namen eingeben",swapHint:"Tippe auf ⇄ neben einem Spieler, dann wähle einen Ersatz.",compareTitle:"Teams vergleichen",saveAsA:"Als A speichern",saveAsB:"Als B speichern",onlyIn:"Nur in",both:"In beiden",needNine:"Wähle zuerst 9 Spieler",confirmDelete:"Dieses Turnier löschen?",saveLibA:"💾 A speichern",saveLibB:"💾 B speichern",nameForVariant:"Name für diese Variante",savedToLibrary:"Gespeichert",jumpPlaceholder:"Zu Position Nr. springen",jumpBtn:"Los",viewFlat:"Liste",viewBracket:"Nach Raster",upperHalf:"Obere Rasterhälfte",lowerHalf:"Untere Rasterhälfte",notFound:"Position nicht gefunden",suggestBtn:"🎯 Team vorschlagen",noEarlierThan:"Nicht vor",noClashAtAll:"Gar keine Begegnung",suggestSuccess:"Fertig: Team ohne Begegnung vor der gewählten Runde",suggestNeedNine:"Mindestens 9 Spieler im Raster nötig",suggestPartial:(n)=>`Kein vollständiges Neunerteam gefunden — nur ${n} von 9. Versuche eine frühere Runde.`,myLineups:"Teams",clearSelection:"Team leeren",noTournaments:"Keine gespeicherten Turniere",noLineups:"Keine gespeicherten Teams",suggestVariant:"Fertig: eine neue Variante mit minimalen Änderungen",tour:"Tour",statsStatus:"Statistik",statsNotLoaded:"Nicht geladen",statsLoading:"Statistik wird geladen...",statsFailed:"Laden fehlgeschlagen — Basispriorität verwendet",favShort:"Fav.",dogShort:"Außenseiter"},
+  es:{title:"Draw Clash Checker",subtitle:"Comprueba tu equipo de nueve: dónde se cruza consigo mismo en el cuadro.",tournament:"Torneo",name:"Nombre",surface:"Superficie",drawSize:"Tamaño del cuadro",howTo:"¿Cómo obtener el JSON?",jsonLabel:"JSON del cuadro",importBtn:"Importar cuadro",selection:"Selección de los nueve",selected:"Seleccionados",fullDraw:"Cuadro completo",early:"Cruce temprano",mid:"Ronda intermedia",late:"Cruce tardío",lineupResults:"Equipo y cruces",disclaimer:"Solo el hecho estructural de un posible cruce.",noData:"sin datos",copied:"Copiado",credit:"Creado por Huntsman",myTournaments:"Mis torneos",libraryEmpty:"Aún no hay torneos guardados",saveToLibrary:"Guardar",enterName:"Introduce un nombre primero",swapHint:"Toca ⇄ junto a un jugador y elige un reemplazo.",compareTitle:"Comparar equipos",saveAsA:"Guardar como A",saveAsB:"Guardar como B",onlyIn:"Solo en",both:"En ambos",needNine:"Selecciona primero 9 jugadores",confirmDelete:"¿Eliminar este torneo?",saveLibA:"💾 Guardar A",saveLibB:"💾 Guardar B",nameForVariant:"Nombre para esta variante",savedToLibrary:"Guardado",jumpPlaceholder:"Ir a la posición n.°",jumpBtn:"Ir",viewFlat:"Lista",viewBracket:"Por cuadro",upperHalf:"Mitad superior del cuadro",lowerHalf:"Mitad inferior del cuadro",notFound:"Posición no encontrada",suggestBtn:"🎯 Sugerir equipo",noEarlierThan:"No antes de",noClashAtAll:"Sin cruces en absoluto",suggestSuccess:"Listo: equipo sin cruces antes de la etapa elegida",suggestNeedNine:"Se necesitan al menos 9 jugadores en el cuadro",suggestPartial:(n)=>`No se encontró un equipo completo de nueve — solo ${n} de 9. Prueba una etapa anterior.`,myLineups:"Equipos",clearSelection:"Vaciar equipo",noTournaments:"No hay torneos guardados",noLineups:"No hay equipos guardados",suggestVariant:"Listo: una nueva variante con cambios mínimos",tour:"Circuito",statsStatus:"Estadísticas",statsNotLoaded:"No cargadas",statsLoading:"Cargando estadísticas...",statsFailed:"Fallo al cargar — se usa prioridad básica",favShort:"fav.",dogShort:"aspirante"},
+  it:{title:"Draw Clash Checker",subtitle:"Controlla la tua squadra di nove: dove si incrocia con sé stessa nel tabellone.",tournament:"Torneo",name:"Nome",surface:"Superficie",drawSize:"Dimensione tabellone",howTo:"Come ottenere il JSON?",jsonLabel:"JSON del tabellone",importBtn:"Importa tabellone",selection:"Selezione dei nove",selected:"Selezionati",fullDraw:"Tabellone completo",early:"Incrocio precoce",mid:"Turno intermedio",late:"Incrocio tardivo",lineupResults:"Squadra e incroci",disclaimer:"Solo il fatto strutturale di un possibile incrocio.",noData:"nessun dato",copied:"Copiato",credit:"Creato da Huntsman",myTournaments:"I miei tornei",libraryEmpty:"Nessun torneo salvato",saveToLibrary:"Salva",enterName:"Inserisci prima un nome",swapHint:"Tocca ⇄ accanto a un giocatore, poi scegli un sostituto.",compareTitle:"Confronta squadre",saveAsA:"Salva come A",saveAsB:"Salva come B",onlyIn:"Solo in",both:"In entrambi",needNine:"Seleziona prima 9 giocatori",confirmDelete:"Eliminare questo torneo?",saveLibA:"💾 Salva A",saveLibB:"💾 Salva B",nameForVariant:"Nome per questa variante",savedToLibrary:"Salvato",jumpPlaceholder:"Vai alla posizione n.",jumpBtn:"Vai",viewFlat:"Elenco",viewBracket:"Per tabellone",upperHalf:"Metà superiore del tabellone",lowerHalf:"Metà inferiore del tabellone",notFound:"Posizione non trovata",suggestBtn:"🎯 Suggerisci squadra",noEarlierThan:"Non prima di",noClashAtAll:"Nessun incrocio del tutto",suggestSuccess:"Fatto: squadra senza incroci prima della fase scelta",suggestNeedNine:"Servono almeno 9 giocatori nel tabellone",suggestPartial:(n)=>`Non è stata trovata una squadra completa di nove — solo ${n} su 9. Prova una fase precedente.`,myLineups:"Squadre",clearSelection:"Svuota squadra",noTournaments:"Nessun torneo salvato",noLineups:"Nessuna squadra salvata",suggestVariant:"Fatto: una nuova variante con modifiche minime",tour:"Circuito",statsStatus:"Statistiche",statsNotLoaded:"Non caricate",statsLoading:"Caricamento statistiche...",statsFailed:"Caricamento fallito — usata priorità base",favShort:"fav.",dogShort:"outsider"},
+  pl:{title:"Draw Clash Checker",subtitle:"Sprawdź swoją dziewiątkę: gdzie krzyżuje się sama ze sobą w drabince.",tournament:"Turniej",name:"Nazwa",surface:"Nawierzchnia",drawSize:"Rozmiar drabinki",howTo:"Jak uzyskać JSON?",jsonLabel:"JSON drabinki",importBtn:"Importuj drabinkę",selection:"Wybór dziewiątki",selected:"Wybrano",fullDraw:"Pełna drabinka",early:"Wczesna kolizja",mid:"Środkowa runda",late:"Późna kolizja",lineupResults:"Skład i kolizje",disclaimer:"Tylko strukturalny fakt możliwej kolizji.",noData:"brak danych",copied:"Skopiowano",credit:"Stworzone przez Huntsman",myTournaments:"Moje turnieje",libraryEmpty:"Brak zapisanych turniejów",saveToLibrary:"Zapisz",enterName:"Najpierw wpisz nazwę",swapHint:"Dotknij ⇄ obok gracza, a potem wybierz zamiennika.",compareTitle:"Porównaj składy",saveAsA:"Zapisz jako A",saveAsB:"Zapisz jako B",onlyIn:"Tylko w",both:"W obu",needNine:"Najpierw wybierz 9 graczy",confirmDelete:"Usunąć ten turniej?",saveLibA:"💾 Zapisz A",saveLibB:"💾 Zapisz B",nameForVariant:"Nazwa dla tego wariantu",savedToLibrary:"Zapisano",jumpPlaceholder:"Przejdź do pozycji nr",jumpBtn:"Przejdź",viewFlat:"Lista",viewBracket:"Wg drabinki",upperHalf:"Górna połowa drabinki",lowerHalf:"Dolna połowa drabinki",notFound:"Nie znaleziono pozycji",suggestBtn:"🎯 Zasugeruj skład",noEarlierThan:"Nie wcześniej niż",noClashAtAll:"Zupełnie bez kolizji",suggestSuccess:"Gotowe: skład bez kolizji przed wybranym etapem",suggestNeedNine:"Potrzeba minimum 9 graczy w drabince",suggestPartial:(n)=>`Nie udało się znaleźć pełnej dziewiątki — dobrano tylko ${n} z 9. Spróbuj wcześniejszy etap.`,myLineups:"Składy",clearSelection:"Wyczyść skład",noTournaments:"Brak zapisanych turniejów",noLineups:"Brak zapisanych składów",suggestVariant:"Gotowe: nowy wariant z minimalnymi zmianami",tour:"Tura",statsStatus:"Statystyki",statsNotLoaded:"Niezaładowane",statsLoading:"Ładowanie statystyk...",statsFailed:"Nie udało się załadować — użyto podstawowego priorytetu",favShort:"fav.",dogShort:"outsider"}
 };
 const INSTR = {
   ru:`<ol><li>Открой draw-страницу нужного турнира на tennistemple.com, скопируй ссылку</li><li>Открой чат с любым ИИ, который умеет переходить по ссылкам</li><li>Вставь ссылку и такой запрос:<div class="quote" id="q_ru">Перейди по этой ссылке на сетку теннисного турнира и извлеки данные каждого игрока в формате JSON: массив объектов с полями name, pos, seed, surfaceScore (всегда null). Верни только JSON.<span class="copybtn" onclick="copyQuote('q_ru')">Копировать</span></div></li><li>Скопируй JSON-ответ</li><li>Вставь его в поле импорта и нажми «Импортировать сетку»</li></ol>`,
@@ -318,7 +332,7 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ const key = el.getAttribute('data-i18n-ph'); if(t[key]) el.setAttribute('placeholder', t[key]); });
   document.querySelectorAll('[data-i18n-title]').forEach(el=>{ const key = el.getAttribute('data-i18n-title'); if(t[key]) el.setAttribute('title', t[key]); });
   document.getElementById('instrBody').innerHTML = t.instr;
-  renderLangMenu(); renderLibrary(); populateThresholdOptions(); renderList(); renderResults(); renderCompare();
+  renderLangMenu(); renderLibrary(); populateThresholdOptions(); renderList(); renderResults(); renderCompare(); updateStatsStatusUI();
 }
 function copyQuote(id){
   const el = document.getElementById(id);
@@ -360,6 +374,115 @@ function getSurname(name){
   // "Dayana Yastremska" style: surname is the last token
   return last;
 }
+function statsKey(name){
+  const parts = name.trim().split(/\s+/);
+  let surname, initial;
+  if(parts.length===1){ surname = parts[0]; initial=''; }
+  else {
+    const last = parts[parts.length-1];
+    if(/^[A-ZÀ-ÖØ-Þ]\.?$/.test(last)){ surname = parts[0]; initial = last[0]; }
+    else { surname = last; initial = parts[0][0]; }
+  }
+  return (surname+initial).toLowerCase().replace(/[^a-zà-ÿ]/g,'');
+}
+let statsIndex = null;
+let statsMeta = null;
+function buildStatsIndex(matches){
+  const idx = {};
+  matches.forEach(m=>{
+    if(!m.winner || !m.loser) return;
+    const wKey = statsKey(m.winner), lKey = statsKey(m.loser);
+    (idx[wKey] = idx[wKey]||[]).push({opp:lKey, win:true, surface:m.surface, date:m.date||'', tier:m.tier, rank:m.wrank});
+    (idx[lKey] = idx[lKey]||[]).push({opp:wKey, win:false, surface:m.surface, date:m.date||'', tier:m.tier, rank:m.lrank});
+  });
+  Object.values(idx).forEach(arr=>arr.sort((a,b)=> b.date.localeCompare(a.date)));
+  return idx;
+}
+const MALAGA_WEIGHTS = {rank:0.20, form:0.30, surface:0.14, h2h:0.11, winLoss:0.21, tourney:0.04};
+const TIER_WEIGHTS = {'Grand Slam':1,'Masters 1000':0.85,'ATP500':0.6,'ATP250':0.4,'International':0.3,'Premier':0.6,'Premier Mandatory':0.85,'Premier 5':0.75};
+function playerFactors(key, surface){
+  if(!statsIndex) return null;
+  const list = statsIndex[key];
+  if(!list || !list.length) return null;
+  const rank = list[0].rank;
+  const rankScore = rank ? Math.max(0, 1-(rank-1)/150) : 0.4;
+  const last10 = list.slice(0,10);
+  const formScore = last10.length ? last10.filter(m=>m.win).length/last10.length : 0.5;
+  const surfMatches = list.filter(m=>m.surface && surface && m.surface.toLowerCase()===surface.toLowerCase());
+  const surfaceScoreV = surfMatches.length ? surfMatches.filter(m=>m.win).length/surfMatches.length : formScore;
+  const winLossScore = list.filter(m=>m.win).length/list.length;
+  const recentTiers = list.slice(0,10).map(m=>TIER_WEIGHTS[m.tier]??0.4);
+  const tourneyScore = recentTiers.length ? recentTiers.reduce((a,b)=>a+b,0)/recentTiers.length : 0.4;
+  return {rankScore, formScore, surfaceScoreV, winLossScore, tourneyScore, rank};
+}
+function compositeScore(factors){
+  if(!factors) return null;
+  return MALAGA_WEIGHTS.rank*factors.rankScore + MALAGA_WEIGHTS.form*factors.formScore + MALAGA_WEIGHTS.surface*factors.surfaceScoreV + MALAGA_WEIGHTS.winLoss*factors.winLossScore + MALAGA_WEIGHTS.tourney*factors.tourneyScore;
+}
+function h2hScore(keyA, keyB){
+  if(!statsIndex) return 0.5;
+  const list = (statsIndex[keyA]||[]).filter(m=>m.opp===keyB);
+  if(!list.length) return 0.5;
+  return list.filter(m=>m.win).length/list.length;
+}
+function pairWinProbability(nameA, nameB, surface){
+  if(!statsIndex) return null;
+  const keyA = statsKey(nameA), keyB = statsKey(nameB);
+  const fA = playerFactors(keyA, surface), fB = playerFactors(keyB, surface);
+  if(!fA && !fB) return null;
+  const baseA = compositeScore(fA) ?? 0.4;
+  const baseB = compositeScore(fB) ?? 0.4;
+  const h2hA = h2hScore(keyA, keyB);
+  const scoreA = baseA*(1-MALAGA_WEIGHTS.h2h) + h2hA*MALAGA_WEIGHTS.h2h;
+  const scoreB = baseB*(1-MALAGA_WEIGHTS.h2h) + (1-h2hA)*MALAGA_WEIGHTS.h2h;
+  const prob = 1/(1+Math.exp(-(scoreA-scoreB)*6));
+  return prob;
+}
+function currentStatsSurface(){
+  const v = document.getElementById('tSurface')?.value || 'hard';
+  return v.charAt(0).toUpperCase()+v.slice(1);
+}
+function updateStatsStatusUI(){
+  const el = document.getElementById('statsStatus');
+  if(!el) return;
+  if(!statsMeta){ el.textContent = T().statsNotLoaded; return; }
+  const ageMin = Math.round((Date.now()-statsMeta.fetchedAt)/60000);
+  const ageText = ageMin<60 ? `${ageMin} мин` : `${Math.round(ageMin/60)} ч`;
+  el.textContent = `${statsMeta.tour.toUpperCase()} ${statsMeta.year} · ${statsMeta.count} матчей · ${ageText}`;
+}
+async function ensureStatsLoaded(){
+  const tour = document.getElementById('tTour')?.value || 'atp';
+  const year = new Date().getFullYear();
+  const cacheKey = `dcc_stats_${tour}_${year}`;
+  try{
+    const cached = localStorage.getItem(cacheKey);
+    if(cached){
+      const parsed = JSON.parse(cached);
+      if(Date.now()-parsed.fetchedAt < 12*3600*1000){
+        statsIndex = buildStatsIndex(parsed.matches);
+        statsMeta = {tour, year, fetchedAt:parsed.fetchedAt, count:parsed.matches.length};
+        updateStatsStatusUI();
+        return true;
+      }
+    }
+  }catch(e){}
+  const statusEl = document.getElementById('statsStatus');
+  if(statusEl) statusEl.textContent = T().statsLoading;
+  try{
+    const resp = await fetch(`/api/stats?tour=${tour}&year=${year}`);
+    if(!resp.ok) throw new Error('bad response');
+    const data = await resp.json();
+    statsIndex = buildStatsIndex(data.matches);
+    statsMeta = {tour, year, fetchedAt: Date.now(), count: data.matches.length};
+    try{ localStorage.setItem(cacheKey, JSON.stringify({matches:data.matches, fetchedAt:statsMeta.fetchedAt})); }catch(e){}
+    updateStatsStatusUI();
+    return true;
+  }catch(e){
+    statsIndex = null; statsMeta = null;
+    if(statusEl) statusEl.textContent = T().statsFailed;
+    return false;
+  }
+}
 function populateThresholdOptions(){
   const sel = document.getElementById('clashThreshold');
   if(!sel) return;
@@ -371,6 +494,11 @@ function populateThresholdOptions(){
   if(prev!=='' && +prev < names.length+1) sel.value = prev;
 }
 function playerPriority(p){
+  if(statsIndex){
+    const f = playerFactors(statsKey(p.name), currentStatsSurface());
+    const score = compositeScore(f);
+    if(score!=null) return 100 - score*100;
+  }
   if(p.surfaceScore!=null) return 100 - p.surfaceScore;
   if(p.seed!=null) return 50 + p.seed*0.1;
   return 200 + p.pos*0.001;
@@ -413,8 +541,12 @@ function tryNearbyVariant(thresholdIdx){
   }
   return best;
 }
-function suggestLineup(){
+async function suggestLineup(){
   if(players.length<9){ alert(T().suggestNeedNine); return; }
+  const btn = document.getElementById('suggestBtnEl');
+  if(btn) btn.disabled = true;
+  await ensureStatsLoaded();
+  if(btn) btn.disabled = false;
   const thresholdIdx = +document.getElementById('clashThreshold').value;
 
   const variant = tryNearbyVariant(thresholdIdx);
@@ -656,15 +788,32 @@ function renderList(){
   const lowerHtml = buildHalfHtml(half+1, size);
   list.innerHTML = `<div class="half-label">${T().upperHalf}</div>${upperHtml}<div class="half-label">${T().lowerHalf}</div>${lowerHtml}`;
 }
+function findR1Partner(p, allPlayers){
+  const isOdd = p.pos % 2 === 1;
+  const partnerPos = isOdd ? p.pos+1 : p.pos-1;
+  return allPlayers.find(x=>x.pos===partnerPos) || null;
+}
 function renderGrid(){
   const grid = document.getElementById('gridView');
   const sorted = [...players].sort((a,b)=>a.pos-b.pos);
   const lineupFull = selected.length>=9;
+  const surface = currentStatsSurface();
   grid.innerHTML = sorted.map(p=>{
     const isSel = selected.includes(p.pos);
     const short = getSurname(p.name).slice(0,7);
     let cls = 'gcell';
     let style = '';
+    let title = p.name;
+    if(statsIndex){
+      const partner = findR1Partner(p, players);
+      if(partner){
+        const prob = pairWinProbability(p.name, partner.name, surface);
+        if(prob!==null){
+          const pct = Math.round(prob*100);
+          title += ` — ${pct}% ${T().favShort||''} vs ${partner.name}`.trim();
+        }
+      }
+    }
     if(isSel){
       cls += ' selected';
       const others = selected.filter(x=>x!==p.pos);
@@ -682,7 +831,7 @@ function renderGrid(){
     } else if(lineupFull){
       cls += ' full';
     }
-    return `<div class="${cls}" style="${style}" title="${p.name}" onclick="toggleSelect(${p.pos})">${p.pos}<br>${short}</div>`;
+    return `<div class="${cls}" style="${style}" title="${title}" onclick="toggleSelect(${p.pos})">${p.pos}<br>${short}</div>`;
   }).join('');
 }
 function renderResults(){
@@ -697,10 +846,22 @@ function renderResults(){
   const summary = document.getElementById('summaryBox');
   const summaryColor = s.nearestRound===null ? 'var(--accent)' : roundColor(s.nearestRound);
   summary.innerHTML = `<span>${cleanCountText(s.cleanCount, s.total)}</span><b style="color:${summaryColor}">${s.nearestRound===null? noneAtAllText() : nearestText()+': '+names[s.nearestRound]}</b>`;
+  const surface = currentStatsSurface();
   wrap.innerHTML = selPlayers.map(p=>{
     const clashes = selPlayers.filter(o=>o.pos!==p.pos).map(o=>{ const r = meetRound(p.pos,o.pos); return r!==null ? {name:o.name, round:r} : null; }).filter(Boolean).sort((a,b)=>a.round-b.round);
     const surfHtml = p.surfaceScore!==null ? `<div class="surf-bar"><div class="surf-fill" style="width:${p.surfaceScore}%"></div></div>` : `<div class="pcard-meta" style="margin-top:6px">${T().noData}</div>`;
-    const clashHtml = clashes.length ? `<div class="clash-list">${clashes.map(c=>`<div class="clash-tag" style="background:${roundColor(c.round)}22;color:${roundColor(c.round)}"><span>${c.name}</span><span>${names[c.round]}</span></div>`).join('')}</div>` : `<div class="clean-tag">${noClashText()}</div>`;
+    const clashHtml = clashes.length ? `<div class="clash-list">${clashes.map(c=>{
+      let probBadge = '';
+      if(statsIndex && c.round===0){
+        const prob = pairWinProbability(p.name, c.name, surface);
+        if(prob!==null){
+          const pct = Math.round(prob*100);
+          const cls2 = prob>=0.5 ? 'fav' : 'dog';
+          probBadge = `<span class="prob-badge ${cls2}">${pct}%</span>`;
+        }
+      }
+      return `<div class="clash-tag" style="background:${roundColor(c.round)}22;color:${roundColor(c.round)}"><span>${c.name}${probBadge}</span><span>${names[c.round]}</span></div>`;
+    }).join('')}</div>` : `<div class="clean-tag">${noClashText()}</div>`;
     return `<div class="pcard"><div class="pcard-head"><div class="pcard-name">${p.name}</div><div class="pcard-meta">#${p.pos}${p.seed?' #'+p.seed:''}</div></div>${surfHtml}${clashHtml}</div>`;
   }).join('');
 }
