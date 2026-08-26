@@ -1,11 +1,21 @@
-const XLSX = require('xlsx');
-
 module.exports = async (req, res) => {
+  let XLSX;
   try {
-    const tourRaw = (req.query.tour || 'atp').toString().toLowerCase();
+    XLSX = require('xlsx');
+  } catch (loadErr) {
+    res.status(500).json({
+      error: 'xlsx module failed to load',
+      detail: String((loadErr && loadErr.message) || loadErr),
+    });
+    return;
+  }
+
+  try {
+    const query = req.query || {};
+    const tourRaw = (query.tour || 'atp').toString().toLowerCase();
     const tour = tourRaw === 'wta' ? 'wta' : 'atp';
     const now = new Date();
-    const year = parseInt(req.query.year, 10) || now.getFullYear();
+    const year = parseInt(query.year, 10) || now.getFullYear();
 
     const url = tour === 'wta'
       ? `http://www.tennis-data.co.uk/${year}w/${year}.xlsx`
@@ -51,6 +61,6 @@ module.exports = async (req, res) => {
       matches,
     });
   } catch (err) {
-    res.status(500).json({ error: String((err && err.message) || err) });
+    res.status(500).json({ error: String((err && err.message) || err), stack: (err && err.stack) ? String(err.stack).split('\n').slice(0,5) : null });
   }
 };
