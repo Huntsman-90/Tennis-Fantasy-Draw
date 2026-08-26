@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draw Clash Checker</title>
+<style>
+  :root{
+    --bg:#0F1C24; --surface:#152833; --surface-2:#1C3140; --line:#28414F;
+    --text:#E8EDE9; --muted:#7FA0A6; --accent:#C7FF6B; --accent-dim:#7FA347; --warn:#FF7A63;
+    --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 14px 40px;-webkit-tap-highlight-color:transparent}
+  .header{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  h1{font-size:19px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
+  h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .sub{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.5}
+  .langsel{position:relative}
+  .langbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:7px 10px;font-size:16px;cursor:pointer;color:var(--text)}
+  .langmenu{position:absolute;right:0;top:38px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px;display:none;z-index:10;min-width:150px}
+  .langmenu.open{display:block}
+  .langitem{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px}
+  .langitem:hover{background:var(--surface-2)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin:0 0 10px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  label{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
+  input,select,textarea{width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font-size:14px;font-family:var(--sans)}
+  textarea{font-family:var(--mono);font-size:11.5px;min-height:80px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .row{display:flex;gap:8px}
+  .row>div{flex:1}
+  button{border:none;border-radius:9px;padding:11px 14px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  .btn-main{background:var(--accent);color:#0F1C24;width:100%;margin-top:10px}
+  .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent-dim);width:100%;margin-top:8px;text-align:left;display:flex;justify-content:space-between;align-items:center}
+  .btn-small{background:var(--surface-2);color:var(--accent);border:1px solid var(--accent-dim);padding:7px 10px;font-size:11.5px}
+  .instr-body{display:none;margin-top:10px;font-size:12.5px;line-height:1.6;color:var(--muted)}
+  .instr-body.open{display:block}
+  .instr-body ol{padding-left:18px;margin:8px 0}
+  .quote{position:relative;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 36px 10px 10px;font-family:var(--mono);font-size:10.5px;margin:8px 0;color:var(--text)}
+  .copybtn{position:absolute;top:8px;right:8px;background:var(--accent-dim);color:#0F1C24;border-radius:6px;padding:4px 7px;font-size:10px;font-weight:700}
+  .counter{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12.5px;color:var(--muted)}
+  .counter b{color:var(--accent);font-family:var(--mono)}
+  .summary{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12.5px}
+  .summary b{font-family:var(--mono)}
+  .plist{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:10px}
+  .prow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #1C2F3A;font-size:12.5px;cursor:pointer}
+  .prow:last-child{border-bottom:none}
+  .prow.selected{background:rgba(199,255,107,0.08)}
+  .prow.candidate{background:rgba(244,211,94,0.06)}
+  .prow .pos{font-family:var(--mono);color:var(--muted);width:32px;flex-shrink:0}
+  .prow .nm{flex:1;font-weight:500}
+  .prow .sd{font-family:var(--mono);color:var(--muted);font-size:11px}
+  .badge{width:20px;height:20px;border-radius:50%;background:var(--accent);color:#0F1C24;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .badge.empty{background:var(--surface-2);border:1px solid var(--line)}
+  .delta{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:5px;flex-shrink:0}
+  .delta.up{color:var(--accent);background:rgba(199,255,107,0.12)}
+  .delta.down{color:var(--warn);background:rgba(255,122,99,0.12)}
+  .delta.same{color:var(--muted);background:var(--surface-2)}
+  .pcard{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .pcard-head{display:flex;justify-content:space-between;align-items:center}
+  .pcard-name{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px}
+  .swapbtn{background:var(--surface);color:var(--muted);border:1px solid var(--line);border-radius:6px;width:24px;height:24px;font-size:12px;padding:0;flex-shrink:0}
+  .swapbtn.active{background:var(--accent);color:#0F1C24;border-color:var(--accent)}
+  .pcard-meta{font-family:var(--mono);color:var(--muted);font-size:11px;margin-top:2px}
+  .surf-bar{height:5px;border-radius:3px;background:var(--surface);margin-top:6px;overflow:hidden}
+  .surf-fill{height:100%;background:var(--accent)}
+  .clash-list{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+  .clash-tag{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:5px 8px;border-radius:6px;font-family:var(--mono)}
+  .clean-tag{color:var(--accent);font-size:11px;margin-top:6px}
+  .grid-view{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:3px;margin-top:4px}
+  .gcell{aspect-ratio:1;border-radius:5px;background:var(--surface-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:9px;font-family:var(--mono);color:var(--muted);text-align:center;line-height:1.2;cursor:pointer;user-select:none}
+  .gcell.selected{border-width:2px;color:#0F1C24;font-weight:700}
+  .gcell.candidate{border-width:2px}
+  .gcell.full{opacity:0.35;cursor:not-allowed}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:10.5px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:4px}
+  .dotc{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .footer{margin-top:18px;font-size:10.5px;color:var(--muted);line-height:1.6;text-align:center}
+  .credit{font-size:9.5px;color:var(--muted);opacity:0.7;margin-top:4px}
+  .lib-item{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);border-radius:9px;padding:9px 11px;margin-bottom:6px;font-size:12.5px;cursor:pointer}
+  .lib-item:last-child{margin-bottom:0}
+  .lib-info{flex:1}
+  .lib-name{font-weight:600}
+  .lib-meta{font-family:var(--mono);color:var(--muted);font-size:10.5px;margin-top:2px}
+  .lib-del{background:none;border:none;color:var(--warn);font-size:15px;padding:0 6px}
+  .empty-hint{color:var(--muted);font-size:12px;text-align:center;padding:10px 0}
+  .cmp-row{display:flex;gap:8px;margin-top:8px}
+  .cmp-col{flex:1;background:var(--surface-2);border-radius:9px;padding:9px 10px;font-size:11.5px}
+  .cmp-col h3{font-size:11px;color:var(--accent);margin:0 0 6px;text-transform:uppercase;letter-spacing:0.4px}
+  .cmp-player{padding:3px 0;font-family:var(--mono);font-size:11px}
+  .cmp-player.only{color:var(--warn)}
+  .cmp-player.common{color:var(--muted)}
+  .jumprow{display:flex;gap:6px;margin-bottom:8px}
+  .jumprow input{flex:1}
+  .jumprow button{flex-shrink:0;padding:9px 12px;background:var(--surface-2);color:var(--accent);border:1px solid var(--accent-dim)}
+  .viewtoggle{display:flex;background:var(--surface-2);border-radius:9px;padding:3px;margin-bottom:8px}
+  .viewtoggle button{flex:1;background:transparent;color:var(--muted);font-size:11.5px;padding:7px}
+  .viewtoggle button.active{background:var(--accent);color:#0F1C24}
+  .half-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:10px 0 4px;padding:0 2px}
+  .half-label:first-child{margin-top:0}
+  .pair-box{border:1px solid var(--line);border-radius:8px;margin-bottom:6px;overflow:hidden}
+  .pair-box .prow{border-bottom:1px solid #1C2F3A}
+  .pair-box .prow:last-child{border-bottom:none}
+  .flash{animation:flashbg 1.2s ease}
+  @keyframes flashbg{0%{background:rgba(199,255,107,0.35)}100%{background:transparent}}
+  .suggest-row{display:flex;gap:6px;margin-bottom:8px}
+  .suggest-row select{flex:1}
+  .suggest-row button{flex-shrink:0;background:var(--accent);color:#0F1C24;padding:9px 12px;font-size:12.5px}
+  .btn-icon{background:var(--surface-2);color:var(--muted);border:1px solid var(--line);border-radius:8px;width:28px;height:28px;font-size:14px;padding:0;flex-shrink:0}
+  .lib-section-btn{background:var(--surface-2);color:var(--accent);border:1px solid var(--line);width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:12.5px}
+  .lib-section-btn .cnt{color:var(--muted);font-family:var(--mono);margin-left:auto;margin-right:8px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1><span class="dot"></span><span data-i18n="title">Draw Clash Checker</span></h1>
+  </div>
+  <div class="langsel">
+    <button class="langbtn" id="langBtn" onclick="toggleLangMenu()">🇷🇺</button>
+    <div class="langmenu" id="langMenu"></div>
+  </div>
+</div>
+<p class="sub" data-i18n="subtitle">Проверка своей девятки: где по сетке она пересекается сама с собой.</p>
+
+<div class="card">
+  <button class="lib-section-btn" onclick="toggleLibSection('tournaments')">
+    <span data-i18n="myTournaments">Турниры</span><span class="cnt" id="tourCount">0</span><span id="tourArrow">▾</span>
+  </button>
+  <div class="instr-body" id="tourList" style="margin-bottom:8px"></div>
+  <button class="lib-section-btn" onclick="toggleLibSection('lineups')">
+    <span data-i18n="myLineups">Составы</span><span class="cnt" id="lineCount">0</span><span id="lineArrow">▾</span>
+  </button>
+  <div class="instr-body" id="lineList"></div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="tournament">Турнир</h2>
+  <div class="row">
+    <div><label data-i18n="name">Название</label><input id="tName"></div>
+    <div><label data-i18n="surface">Покрытие</label>
+      <select id="tSurface"><option value="hard">Hard</option><option value="clay">Clay</option><option value="grass">Grass</option></select>
+    </div>
+  </div>
+  <label style="margin-top:10px" data-i18n="drawSize">Размер сетки</label>
+  <select id="tSize">
+    <option value="16">16</option><option value="28">28</option><option value="32" selected>32</option><option value="64">64</option><option value="128">128</option>
+  </select>
+
+  <button class="btn-ghost" onclick="toggleInstr()"><span data-i18n="howTo">Как получить JSON?</span><span id="instrArrow">▾</span></button>
+  <div class="instr-body" id="instrBody"></div>
+
+  <label style="margin-top:10px" data-i18n="jsonLabel">JSON сетки</label>
+  <textarea id="jsonImport" placeholder='[{"name":"Zverev A.","pos":1,"seed":1,"surfaceScore":70}, ...]'></textarea>
+  <button class="btn-main" onclick="importJSON()" data-i18n="importBtn">Импортировать сетку</button>
+  <button class="btn-ghost" id="saveLibBtn" onclick="saveToLibrary()" style="display:none"><span data-i18n="saveToLibrary">Сохранить в библиотеку</span><span>💾</span></button>
+</div>
+
+<div class="card" id="selectCard" style="display:none">
+  <h2 data-i18n="selection">Выбор девятки</h2>
+  <div class="counter"><span data-i18n="selected">Выбрано</span><b id="selCount">0 / 9</b></div>
+  <div class="suggest-row">
+    <select id="clashThreshold"></select>
+    <button onclick="suggestLineup()" data-i18n="suggestBtn">🎯 Подсказать состав</button>
+  </div>
+  <div class="jumprow">
+    <input id="jumpBox" type="number" data-i18n-ph="jumpPlaceholder" placeholder="Перейти к позиции №">
+    <button onclick="jumpToPosition()" data-i18n="jumpBtn">Перейти</button>
+  </div>
+  <div class="viewtoggle">
+    <button id="viewFlatBtn" class="active" onclick="setListView('flat')" data-i18n="viewFlat">Список</button>
+    <button id="viewBracketBtn" onclick="setListView('bracket')" data-i18n="viewBracket">По сетке</button>
+  </div>
+  <input class="search" id="searchBox" oninput="renderList()">
+  <div class="plist" id="playerList"></div>
+</div>
+
+<div class="card" id="gridCard" style="display:none">
+  <h2><span data-i18n="fullDraw">Полная сетка</span><button class="btn-icon" onclick="clearSelection()" data-i18n-title="clearSelection" title="Очистить состав">↻</button></h2>
+  <div class="grid-view" id="gridView"></div>
+  <div class="legend">
+    <span><i class="dotc" style="background:var(--warn)"></i><span data-i18n="early">Ранняя встреча</span></span>
+    <span><i class="dotc" style="background:#F4D35E"></i><span data-i18n="mid">Средний раунд</span></span>
+    <span><i class="dotc" style="background:var(--accent)"></i><span data-i18n="late">Поздняя встреча</span></span>
+  </div>
+</div>
+
+<div class="card" id="resultCard" style="display:none">
+  <h2 data-i18n="lineupResults">Девятка и пересечения</h2>
+  <div class="summary" id="summaryBox"></div>
+  <p class="sub" style="margin:0 0 8px" data-i18n="swapHint">Нажми ⇄ у игрока, затем выбери замену в списке выше — увидишь разницу заранее.</p>
+  <div id="cardsWrap"></div>
+</div>
+
+<div class="card" id="compareCard" style="display:none">
+  <h2 data-i18n="compareTitle">Сравнение составов</h2>
+  <div class="row">
+    <button class="btn-small" style="flex:1" onclick="saveCompareSlot('A')" data-i18n="saveAsA">Запомнить как A</button>
+    <button class="btn-small" style="flex:1" onclick="saveCompareSlot('B')" data-i18n="saveAsB">Запомнить как B</button>
+  </div>
+  <div id="compareResult"></div>
+  <div class="row" id="compareLibRow" style="display:none;margin-top:8px">
+    <button class="btn-small" style="flex:1" id="libBtnA" onclick="saveCompareSlotToLibrary('A')" data-i18n="saveLibA">💾 A в библиотеку</button>
+    <button class="btn-small" style="flex:1" id="libBtnB" onclick="saveCompareSlotToLibrary('B')" data-i18n="saveLibB">💾 B в библиотеку</button>
+  </div>
+</div>
+
+<div class="footer">
+  <div data-i18n="disclaimer">Только структурный факт возможной встречи по сетке. Данные хранятся локально в браузере.</div>
+  <div class="credit" data-i18n="credit">Создано Huntsman</div>
+</div>
+
+<script>
+const LANGS = [
+  {code:'uk',flag:'🇺🇦',name:'Українська'},
+  {code:'fr',flag:'🇫🇷',name:'Français'},
+  {code:'en',flag:'🇬🇧',name:'English'},
+  {code:'de',flag:'🇩🇪',name:'Deutsch'},
+  {code:'es',flag:'🇪🇸',name:'Español'},
+  {code:'it',flag:'🇮🇹',name:'Italiano'},
+  {code:'pl',flag:'🇵🇱',name:'Polski'},
+  {code:'ru',flag:'🇷🇺',name:'Русский'}
+];
+
+const BASE = {
+  title:"Draw Clash Checker",
+  subtitle:"Проверка своей девятки: где по сетке она пересекается сама с собой.",
+  tournament:"Турнир", name:"Название", surface:"Покрытие", drawSize:"Размер сетки",
+  howTo:"Как получить JSON?", jsonLabel:"JSON сетки", importBtn:"Импортировать сетку",
+  selection:"Выбор девятки", selected:"Выбрано", fullDraw:"Полная сетка",
+  early:"Ранняя встреча", mid:"Средний раунд", late:"Поздняя встреча",
+  lineupResults:"Девятка и пересечения", disclaimer:"Только структурный факт возможной встречи по сетке.",
+  noData:"нет данных", copied:"Скопировано", credit:"Создано Huntsman",
+  myTournaments:"Мои турниры", libraryEmpty:"Пока нет сохранённых турниров",
+  saveToLibrary:"Сохранить в библиотеку", enterName:"Сначала введи название турнира",
+  swapHint:"Нажми ⇄ у игрока, затем выбери замену в списке выше — увидишь разницу заранее.",
+  compareTitle:"Сравнение составов", saveAsA:"Запомнить как A", saveAsB:"Запомнить как B",
+  onlyIn:"Только в", both:"В обоих", needNine:"Сначала выбери 9 игроков", confirmDelete:"Удалить этот турнир?",
+  saveLibA:"💾 A в библиотеку", saveLibB:"💾 B в библиотеку", nameForVariant:"Название для этого варианта", savedToLibrary:"Сохранено в библиотеку",
+  jumpPlaceholder:"Перейти к позиции №", jumpBtn:"Перейти", viewFlat:"Список", viewBracket:"По сетке",
+  upperHalf:"Верхняя половина сетки", lowerHalf:"Нижняя половина сетки", notFound:"Позиция не найдена",
+  suggestBtn:"🎯 Подсказать состав", noEarlierThan:"Не раньше", noClashAtAll:"Совсем без пересечений",
+  suggestSuccess:"Готово: девятка без пересечений раньше выбранного этапа", suggestNeedNine:"Нужно минимум 9 игроков в сетке",
+  suggestPartial:(n)=>`Не удалось найти полную девятку без пересечений — подобрано только ${n} из 9. Попробуй более ранний этап.`,
+  myLineups:"Составы", clearSelection:"Очистить состав", noTournaments:"Нет сохранённых турниров", noLineups:"Нет сохранённых составов",
+  suggestVariant:"Готово: новый вариант с минимальными изменениями"
+};
+const TR = {
+  uk:{title:"Draw Clash Checker",subtitle:"Перевірка своєї дев'ятки: де по сітці вона перетинається сама з собою.",tournament:"Турнір",name:"Назва",surface:"Покриття",drawSize:"Розмір сітки",howTo:"Як отримати JSON?",jsonLabel:"JSON сітки",importBtn:"Імпортувати сітку",selection:"Вибір дев'ятки",selected:"Обрано",fullDraw:"Повна сітка",early:"Рання зустріч",mid:"Середній раунд",late:"Пізня зустріч",lineupResults:"Дев'ятка і перетини",disclaimer:"Лише структурний факт можливої зустрічі.",noData:"немає даних",copied:"Скопійовано",credit:"Створено Huntsman",myTournaments:"Мої турніри",libraryEmpty:"Поки немає збережених турнірів",saveToLibrary:"Зберегти в бібліотеку",enterName:"Спочатку введи назву турніру",swapHint:"Натисни ⇄ біля гравця, потім обери заміну у списку вище.",compareTitle:"Порівняння складів",saveAsA:"Запам'ятати як A",saveAsB:"Запам'ятати як B",onlyIn:"Лише в",both:"В обох",needNine:"Спочатку обери 9 гравців",confirmDelete:"Видалити цей турнір?",saveLibA:"💾 A в бібліотеку",saveLibB:"💾 B в бібліотеку",nameForVariant:"Назва для цього варіанту",savedToLibrary:"Збережено в бібліотеку",jumpPlaceholder:"Перейти до позиції №",jumpBtn:"Перейти",viewFlat:"Список",viewBracket:"По сітці",upperHalf:"Верхня половина сітки",lowerHalf:"Нижня половина сітки",notFound:"Позицію не знайдено",suggestBtn:"🎯 Підказати склад",noEarlierThan:"Не раніше",noClashAtAll:"Зовсім без перетинів",suggestSuccess:"Готово: дев'ятка без перетинів раніше обраного етапу",suggestNeedNine:"Потрібно мінімум 9 гравців у сітці",suggestPartial:(n)=>`Не вдалося знайти повну дев'ятку без перетинів — підібрано лише ${n} з 9. Спробуй раніший етап.`,myLineups:"Склади",clearSelection:"Очистити склад",noTournaments:"Немає збережених турнірів",noLineups:"Немає збережених складів",suggestVariant:"Готово: новий варіант із мінімальними змінами"},
+  en:{title:"Draw Clash Checker",subtitle:"Check your lineup of nine: where it clashes with itself across the draw.",tournament:"Tournament",name:"Name",surface:"Surface",drawSize:"Draw size",howTo:"How to get the JSON?",jsonLabel:"Draw JSON",importBtn:"Import draw",selection:"Select your nine",selected:"Selected",fullDraw:"Full draw",early:"Early clash",mid:"Mid round",late:"Late clash",lineupResults:"Lineup and clashes",disclaimer:"Only the structural fact of a possible clash.",noData:"no data",copied:"Copied",credit:"Created by Huntsman",myTournaments:"My tournaments",libraryEmpty:"No saved tournaments yet",saveToLibrary:"Save to library",enterName:"Enter a tournament name first",swapHint:"Tap ⇄ next to a player, then pick a replacement above.",compareTitle:"Compare lineups",saveAsA:"Save as A",saveAsB:"Save as B",onlyIn:"Only in",both:"In both",needNine:"Select 9 players first",confirmDelete:"Delete this tournament?",saveLibA:"💾 Save A to library",saveLibB:"💾 Save B to library",nameForVariant:"Name for this variant",savedToLibrary:"Saved to library",jumpPlaceholder:"Jump to position #",jumpBtn:"Go",viewFlat:"List",viewBracket:"By bracket",upperHalf:"Upper half of the draw",lowerHalf:"Lower half of the draw",notFound:"Position not found",suggestBtn:"🎯 Suggest lineup",noEarlierThan:"Not before",noClashAtAll:"No clashes at all",suggestSuccess:"Done: a lineup with no clashes before the chosen stage",suggestNeedNine:"Need at least 9 players in the draw",suggestPartial:(n)=>`Could not find a full lineup of nine — only found ${n} of 9. Try an earlier stage.`,myLineups:"Lineups",clearSelection:"Clear lineup",noTournaments:"No saved tournaments",noLineups:"No saved lineups",suggestVariant:"Done: a new variant with minimal changes"},
+  fr:{title:"Draw Clash Checker",subtitle:"Vérifiez votre équipe de neuf : où elle se croise elle-même dans le tableau.",tournament:"Tournoi",name:"Nom",surface:"Surface",drawSize:"Taille du tableau",howTo:"Comment obtenir le JSON ?",jsonLabel:"JSON du tableau",importBtn:"Importer le tableau",selection:"Sélection des neuf",selected:"Sélectionnés",fullDraw:"Tableau complet",early:"Croisement précoce",mid:"Tour intermédiaire",late:"Croisement tardif",lineupResults:"Équipe et croisements",disclaimer:"Uniquement le fait structurel d'un croisement possible.",noData:"aucune donnée",copied:"Copié",credit:"Créé par Huntsman",myTournaments:"Mes tournois",libraryEmpty:"Aucun tournoi enregistré",saveToLibrary:"Enregistrer",enterName:"Indique d'abord un nom",swapHint:"Touchez ⇄ à côté d'un joueur, puis choisissez un remplaçant.",compareTitle:"Comparer les équipes",saveAsA:"Enregistrer comme A",saveAsB:"Enregistrer comme B",onlyIn:"Seulement dans",both:"Dans les deux",needNine:"Sélectionne d'abord 9 joueurs",confirmDelete:"Supprimer ce tournoi ?",saveLibA:"💾 Enregistrer A",saveLibB:"💾 Enregistrer B",nameForVariant:"Nom de cette variante",savedToLibrary:"Enregistré",jumpPlaceholder:"Aller à la position n°",jumpBtn:"Aller",viewFlat:"Liste",viewBracket:"Par tableau",upperHalf:"Moitié supérieure du tableau",lowerHalf:"Moitié inférieure du tableau",notFound:"Position introuvable",suggestBtn:"🎯 Suggérer une équipe",noEarlierThan:"Pas avant",noClashAtAll:"Aucun croisement du tout",suggestSuccess:"Terminé : équipe sans croisement avant le stade choisi",suggestNeedNine:"Il faut au moins 9 joueurs dans le tableau",suggestPartial:(n)=>`Impossible de trouver une équipe complète de neuf — seulement ${n} sur 9 trouvés. Essaie un stade plus précoce.`,myLineups:"Équipes",clearSelection:"Effacer l'équipe",noTournaments:"Aucun tournoi enregistré",noLineups:"Aucune équipe enregistrée",suggestVariant:"Terminé : une nouvelle variante avec des changements minimes"},
+  de:{title:"Draw Clash Checker",subtitle:"Prüfe dein Neunerteam: wo es sich im Raster selbst kreuzt.",tournament:"Turnier",name:"Name",surface:"Belag",drawSize:"Rastergröße",howTo:"Wie bekomme ich das JSON?",jsonLabel:"Raster-JSON",importBtn:"Raster importieren",selection:"Neunerauswahl",selected:"Ausgewählt",fullDraw:"Vollständiges Raster",early:"Frühe Begegnung",mid:"Mittlere Runde",late:"Späte Begegnung",lineupResults:"Team und Begegnungen",disclaimer:"Nur die strukturelle Tatsache einer möglichen Begegnung.",noData:"keine Daten",copied:"Kopiert",credit:"Erstellt von Huntsman",myTournaments:"Meine Turniere",libraryEmpty:"Noch keine gespeicherten Turniere",saveToLibrary:"Speichern",enterName:"Zuerst einen Namen eingeben",swapHint:"Tippe auf ⇄ neben einem Spieler, dann wähle einen Ersatz.",compareTitle:"Teams vergleichen",saveAsA:"Als A speichern",saveAsB:"Als B speichern",onlyIn:"Nur in",both:"In beiden",needNine:"Wähle zuerst 9 Spieler",confirmDelete:"Dieses Turnier löschen?",saveLibA:"💾 A speichern",saveLibB:"💾 B speichern",nameForVariant:"Name für diese Variante",savedToLibrary:"Gespeichert",jumpPlaceholder:"Zu Position Nr. springen",jumpBtn:"Los",viewFlat:"Liste",viewBracket:"Nach Raster",upperHalf:"Obere Rasterhälfte",lowerHalf:"Untere Rasterhälfte",notFound:"Position nicht gefunden",suggestBtn:"🎯 Team vorschlagen",noEarlierThan:"Nicht vor",noClashAtAll:"Gar keine Begegnung",suggestSuccess:"Fertig: Team ohne Begegnung vor der gewählten Runde",suggestNeedNine:"Mindestens 9 Spieler im Raster nötig",suggestPartial:(n)=>`Kein vollständiges Neunerteam gefunden — nur ${n} von 9. Versuche eine frühere Runde.`,myLineups:"Teams",clearSelection:"Team leeren",noTournaments:"Keine gespeicherten Turniere",noLineups:"Keine gespeicherten Teams",suggestVariant:"Fertig: eine neue Variante mit minimalen Änderungen"},
+  es:{title:"Draw Clash Checker",subtitle:"Comprueba tu equipo de nueve: dónde se cruza consigo mismo en el cuadro.",tournament:"Torneo",name:"Nombre",surface:"Superficie",drawSize:"Tamaño del cuadro",howTo:"¿Cómo obtener el JSON?",jsonLabel:"JSON del cuadro",importBtn:"Importar cuadro",selection:"Selección de los nueve",selected:"Seleccionados",fullDraw:"Cuadro completo",early:"Cruce temprano",mid:"Ronda intermedia",late:"Cruce tardío",lineupResults:"Equipo y cruces",disclaimer:"Solo el hecho estructural de un posible cruce.",noData:"sin datos",copied:"Copiado",credit:"Creado por Huntsman",myTournaments:"Mis torneos",libraryEmpty:"Aún no hay torneos guardados",saveToLibrary:"Guardar",enterName:"Introduce un nombre primero",swapHint:"Toca ⇄ junto a un jugador y elige un reemplazo.",compareTitle:"Comparar equipos",saveAsA:"Guardar como A",saveAsB:"Guardar como B",onlyIn:"Solo en",both:"En ambos",needNine:"Selecciona primero 9 jugadores",confirmDelete:"¿Eliminar este torneo?",saveLibA:"💾 Guardar A",saveLibB:"💾 Guardar B",nameForVariant:"Nombre para esta variante",savedToLibrary:"Guardado",jumpPlaceholder:"Ir a la posición n.°",jumpBtn:"Ir",viewFlat:"Lista",viewBracket:"Por cuadro",upperHalf:"Mitad superior del cuadro",lowerHalf:"Mitad inferior del cuadro",notFound:"Posición no encontrada",suggestBtn:"🎯 Sugerir equipo",noEarlierThan:"No antes de",noClashAtAll:"Sin cruces en absoluto",suggestSuccess:"Listo: equipo sin cruces antes de la etapa elegida",suggestNeedNine:"Se necesitan al menos 9 jugadores en el cuadro",suggestPartial:(n)=>`No se encontró un equipo completo de nueve — solo ${n} de 9. Prueba una etapa anterior.`,myLineups:"Equipos",clearSelection:"Vaciar equipo",noTournaments:"No hay torneos guardados",noLineups:"No hay equipos guardados",suggestVariant:"Listo: una nueva variante con cambios mínimos"},
+  it:{title:"Draw Clash Checker",subtitle:"Controlla la tua squadra di nove: dove si incrocia con sé stessa nel tabellone.",tournament:"Torneo",name:"Nome",surface:"Superficie",drawSize:"Dimensione tabellone",howTo:"Come ottenere il JSON?",jsonLabel:"JSON del tabellone",importBtn:"Importa tabellone",selection:"Selezione dei nove",selected:"Selezionati",fullDraw:"Tabellone completo",early:"Incrocio precoce",mid:"Turno intermedio",late:"Incrocio tardivo",lineupResults:"Squadra e incroci",disclaimer:"Solo il fatto strutturale di un possibile incrocio.",noData:"nessun dato",copied:"Copiato",credit:"Creato da Huntsman",myTournaments:"I miei tornei",libraryEmpty:"Nessun torneo salvato",saveToLibrary:"Salva",enterName:"Inserisci prima un nome",swapHint:"Tocca ⇄ accanto a un giocatore, poi scegli un sostituto.",compareTitle:"Confronta squadre",saveAsA:"Salva come A",saveAsB:"Salva come B",onlyIn:"Solo in",both:"In entrambi",needNine:"Seleziona prima 9 giocatori",confirmDelete:"Eliminare questo torneo?",saveLibA:"💾 Salva A",saveLibB:"💾 Salva B",nameForVariant:"Nome per questa variante",savedToLibrary:"Salvato",jumpPlaceholder:"Vai alla posizione n.",jumpBtn:"Vai",viewFlat:"Elenco",viewBracket:"Per tabellone",upperHalf:"Metà superiore del tabellone",lowerHalf:"Metà inferiore del tabellone",notFound:"Posizione non trovata",suggestBtn:"🎯 Suggerisci squadra",noEarlierThan:"Non prima di",noClashAtAll:"Nessun incrocio del tutto",suggestSuccess:"Fatto: squadra senza incroci prima della fase scelta",suggestNeedNine:"Servono almeno 9 giocatori nel tabellone",suggestPartial:(n)=>`Non è stata trovata una squadra completa di nove — solo ${n} su 9. Prova una fase precedente.`,myLineups:"Squadre",clearSelection:"Svuota squadra",noTournaments:"Nessun torneo salvato",noLineups:"Nessuna squadra salvata",suggestVariant:"Fatto: una nuova variante con modifiche minime"},
+  pl:{title:"Draw Clash Checker",subtitle:"Sprawdź swoją dziewiątkę: gdzie krzyżuje się sama ze sobą w drabince.",tournament:"Turniej",name:"Nazwa",surface:"Nawierzchnia",drawSize:"Rozmiar drabinki",howTo:"Jak uzyskać JSON?",jsonLabel:"JSON drabinki",importBtn:"Importuj drabinkę",selection:"Wybór dziewiątki",selected:"Wybrano",fullDraw:"Pełna drabinka",early:"Wczesna kolizja",mid:"Środkowa runda",late:"Późna kolizja",lineupResults:"Skład i kolizje",disclaimer:"Tylko strukturalny fakt możliwej kolizji.",noData:"brak danych",copied:"Skopiowano",credit:"Stworzone przez Huntsman",myTournaments:"Moje turnieje",libraryEmpty:"Brak zapisanych turniejów",saveToLibrary:"Zapisz",enterName:"Najpierw wpisz nazwę",swapHint:"Dotknij ⇄ obok gracza, a potem wybierz zamiennika.",compareTitle:"Porównaj składy",saveAsA:"Zapisz jako A",saveAsB:"Zapisz jako B",onlyIn:"Tylko w",both:"W obu",needNine:"Najpierw wybierz 9 graczy",confirmDelete:"Usunąć ten turniej?",saveLibA:"💾 Zapisz A",saveLibB:"💾 Zapisz B",nameForVariant:"Nazwa dla tego wariantu",savedToLibrary:"Zapisano",jumpPlaceholder:"Przejdź do pozycji nr",jumpBtn:"Przejdź",viewFlat:"Lista",viewBracket:"Wg drabinki",upperHalf:"Górna połowa drabinki",lowerHalf:"Dolna połowa drabinki",notFound:"Nie znaleziono pozycji",suggestBtn:"🎯 Zasugeruj skład",noEarlierThan:"Nie wcześniej niż",noClashAtAll:"Zupełnie bez kolizji",suggestSuccess:"Gotowe: skład bez kolizji przed wybranym etapem",suggestNeedNine:"Potrzeba minimum 9 graczy w drabince",suggestPartial:(n)=>`Nie udało się znaleźć pełnej dziewiątki — dobrano tylko ${n} z 9. Spróbuj wcześniejszy etap.`,myLineups:"Składy",clearSelection:"Wyczyść skład",noTournaments:"Brak zapisanych turniejów",noLineups:"Brak zapisanych składów",suggestVariant:"Gotowe: nowy wariant z minimalnymi zmianami"}
+};
+const INSTR = {
+  ru:`<ol><li>Открой draw-страницу нужного турнира на tennistemple.com, скопируй ссылку</li><li>Открой чат с любым ИИ, который умеет переходить по ссылкам</li><li>Вставь ссылку и такой запрос:<div class="quote" id="q_ru">Перейди по этой ссылке на сетку теннисного турнира и извлеки данные каждого игрока в формате JSON: массив объектов с полями name, pos, seed, surfaceScore (всегда null). Верни только JSON.<span class="copybtn" onclick="copyQuote('q_ru')">Копировать</span></div></li><li>Скопируй JSON-ответ</li><li>Вставь его в поле импорта и нажми «Импортировать сетку»</li></ol>`,
+  uk:`<ol><li>Відкрий сторінку сітки на tennistemple.com</li><li>Відкрий чат з ШІ</li><li>Встав посилання і запит:<div class="quote" id="q_uk">Перейди за цим посиланням і витягни дані у форматі JSON: name, pos, seed, surfaceScore (null). Поверни лише JSON.<span class="copybtn" onclick="copyQuote('q_uk')">Копіювати</span></div></li><li>Скопіюй відповідь</li><li>Встав у поле імпорту</li></ol>`,
+  en:`<ol><li>Open the draw page on tennistemple.com</li><li>Open a chat with any AI</li><li>Paste the link with this request:<div class="quote" id="q_en">Open this link and extract each player's data as JSON: name, pos, seed, surfaceScore (always null). Return only the JSON.<span class="copybtn" onclick="copyQuote('q_en')">Copy</span></div></li><li>Copy the response</li><li>Paste it into the import field</li></ol>`,
+  fr:`<ol><li>Ouvrez la page du tableau sur tennistemple.com</li><li>Ouvrez un chat avec une IA</li><li>Collez le lien avec cette demande :<div class="quote" id="q_fr">Ouvre ce lien et extrais les données en JSON : name, pos, seed, surfaceScore (toujours null). Renvoie uniquement le JSON.<span class="copybtn" onclick="copyQuote('q_fr')">Copier</span></div></li><li>Copiez la réponse</li><li>Collez-la dans le champ d'import</li></ol>`,
+  de:`<ol><li>Öffne die Raster-Seite auf tennistemple.com</li><li>Öffne einen Chat mit einer KI</li><li>Füge den Link mit dieser Anfrage ein:<div class="quote" id="q_de">Öffne diesen Link und extrahiere die Daten als JSON: name, pos, seed, surfaceScore (immer null). Gib nur das JSON zurück.<span class="copybtn" onclick="copyQuote('q_de')">Kopieren</span></div></li><li>Kopiere die Antwort</li><li>Füge sie in das Importfeld ein</li></ol>`,
+  es:`<ol><li>Abre la página del cuadro en tennistemple.com</li><li>Abre un chat con una IA</li><li>Pega el enlace con esta solicitud:<div class="quote" id="q_es">Abre este enlace y extrae los datos en JSON: name, pos, seed, surfaceScore (siempre null). Devuelve solo el JSON.<span class="copybtn" onclick="copyQuote('q_es')">Copiar</span></div></li><li>Copia la respuesta</li><li>Pégala en el campo de importación</li></ol>`,
+  it:`<ol><li>Apri la pagina del tabellone su tennistemple.com</li><li>Apri una chat con un'IA</li><li>Incolla il link con questa richiesta:<div class="quote" id="q_it">Apri questo link ed estrai i dati in JSON: name, pos, seed, surfaceScore (sempre null). Restituisci solo il JSON.<span class="copybtn" onclick="copyQuote('q_it')">Copia</span></div></li><li>Copia la risposta</li><li>Incollala nel campo di importazione</li></ol>`,
+  pl:`<ol><li>Otwórz stronę drabinki na tennistemple.com</li><li>Otwórz czat z AI</li><li>Wklej link z takim poleceniem:<div class="quote" id="q_pl">Otwórz ten link i wyodrębnij dane w formacie JSON: name, pos, seed, surfaceScore (zawsze null). Zwróć wyłącznie JSON.<span class="copybtn" onclick="copyQuote('q_pl')">Kopiuj</span></div></li><li>Skopiuj odpowiedź</li><li>Wklej w pole importu</li></ol>`
+};
+function T(){ const o = Object.assign({}, BASE, TR[currentLang]||{}); o.instr = INSTR[currentLang]||INSTR.ru; return o; }
+function cleanCountText(a,b){
+  const map = {ru:`${a} из ${b} без пересечений`,uk:`${a} з ${b} без перетинів`,en:`${a} of ${b} clash-free`,fr:`${a} sur ${b} sans croisement`,de:`${a} von ${b} ohne Begegnung`,es:`${a} de ${b} sin cruces`,it:`${a} su ${b} senza incroci`,pl:`${a} z ${b} bez kolizji`};
+  return map[currentLang]||map.en;
+}
+function nearestText(){
+  const map = {ru:"Ближайшее пересечение",uk:"Найближчий перетин",en:"Nearest clash",fr:"Croisement le plus proche",de:"Nächste Begegnung",es:"Cruce más cercano",it:"Incrocio più vicino",pl:"Najbliższa kolizja"};
+  return map[currentLang]||map.en;
+}
+function noneAtAllText(){
+  const map = {ru:"Пересечений нет",uk:"Перетинів немає",en:"No clashes",fr:"Aucun croisement",de:"Keine Begegnungen",es:"Sin cruces",it:"Nessun incrocio",pl:"Brak kolizji"};
+  return map[currentLang]||map.en;
+}
+function noClashText(){
+  const map = {ru:"✓ Пересечений с составом нет",uk:"✓ Перетинів зі складом немає",en:"✓ No clashes with the lineup",fr:"✓ Aucun croisement",de:"✓ Keine Begegnungen",es:"✓ Sin cruces",it:"✓ Nessun incrocio",pl:"✓ Brak kolizji"};
+  return map[currentLang]||map.en;
+}
+
+let currentLang = 'ru';
+let players = [];
+let selected = [];
+let library = [];
+let currentLibId = null;
+let replacingPos = null;
+let compareSlots = {A:null, B:null};
+let listView = 'flat';
+let libSectionOpen = {tournaments:false, lineups:false};
+let lastSuggested = null;
+
+function detectInitialLang(){
+  try{
+    const saved = localStorage.getItem('dcc_lang');
+    if(saved && (saved==='ru'||TR[saved])) return saved;
+    const nav = (navigator.language || navigator.languages?.[0] || '').toLowerCase().slice(0,2);
+    if(nav==='ru'||TR[nav]) return nav;
+    return 'en';
+  }catch(e){ return 'en'; }
+}
+function toggleLangMenu(){ document.getElementById('langMenu').classList.toggle('open'); }
+function renderLangMenu(){
+  const menu = document.getElementById('langMenu');
+  menu.innerHTML = LANGS.map(l=>`<div class="langitem" onclick="setLang('${l.code}')">${l.flag} ${l.name}</div>`).join('');
+  document.getElementById('langBtn').textContent = LANGS.find(l=>l.code===currentLang)?.flag || '🌐';
+}
+function setLang(code){ currentLang = code; try{ localStorage.setItem('dcc_lang', code); }catch(e){} document.getElementById('langMenu').classList.remove('open'); applyI18n(); }
+function applyI18n(){
+  const t = T();
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ const key = el.getAttribute('data-i18n'); if(t[key]) el.textContent = t[key]; });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ const key = el.getAttribute('data-i18n-ph'); if(t[key]) el.setAttribute('placeholder', t[key]); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{ const key = el.getAttribute('data-i18n-title'); if(t[key]) el.setAttribute('title', t[key]); });
+  document.getElementById('instrBody').innerHTML = t.instr;
+  renderLangMenu(); renderLibrary(); populateThresholdOptions(); renderList(); renderResults(); renderCompare();
+}
+function copyQuote(id){
+  const el = document.getElementById(id);
+  const text = el.childNodes[0].textContent.trim();
+  navigator.clipboard?.writeText(text);
+  const btn = el.querySelector('.copybtn');
+  const orig = btn.textContent; btn.textContent = T().copied;
+  setTimeout(()=>{ btn.textContent = orig; }, 1500);
+}
+function toggleInstr(){
+  document.getElementById('instrBody').classList.toggle('open');
+  document.getElementById('instrArrow').textContent = document.getElementById('instrBody').classList.contains('open') ? '▴' : '▾';
+}
+function drawSize(){ return +document.getElementById('tSize').value; }
+const ROUND_NAMES_BY_SIZE = {16:['R16','QF','SF','F'],28:['R1','R2','QF','SF','F'],32:['R32','R16','QF','SF','F'],64:['R64','R32','R16','QF','SF','F'],128:['R128','R64','R32','R16','QF','SF','F']};
+function roundNames(){ return ROUND_NAMES_BY_SIZE[drawSize()] || ROUND_NAMES_BY_SIZE[32]; }
+function meetRound(pos1,pos2){
+  const size = drawSize();
+  if(!pos1||!pos2) return null;
+  let group=2, round=0;
+  const maxRound = Math.log2(size);
+  while(round<maxRound){ if(Math.ceil(pos1/group)===Math.ceil(pos2/group)) return round; group*=2; round++; }
+  return null;
+}
+function roundColor(idx){
+  const names = roundNames();
+  const maxIdx = names.length-1;
+  const t = maxIdx===0?1:idx/maxIdx;
+  if(t<0.34) return '#FF7A63'; if(t<0.67) return '#F4D35E'; return '#C7FF6B';
+}
+function getSurname(name){
+  const parts = name.trim().split(/\s+/);
+  if(parts.length===1) return parts[0];
+  const last = parts[parts.length-1];
+  // "Zverev A." style: last token is a single initial + dot -> surname is the first token
+  if(/^[A-ZÀ-ÖØ-Þ]\.?$/.test(last)){
+    return parts[0];
+  }
+  // "Dayana Yastremska" style: surname is the last token
+  return last;
+}
+function populateThresholdOptions(){
+  const sel = document.getElementById('clashThreshold');
+  if(!sel) return;
+  const names = roundNames();
+  const t = T();
+  const prev = sel.value;
+  sel.innerHTML = names.map((n,i)=>`<option value="${i}">${t.noEarlierThan} ${n}</option>`).join('')
+    + `<option value="${names.length}">${t.noClashAtAll}</option>`;
+  if(prev!=='' && +prev < names.length+1) sel.value = prev;
+}
+function playerPriority(p){
+  if(p.surfaceScore!=null) return 100 - p.surfaceScore;
+  if(p.seed!=null) return 50 + p.seed*0.1;
+  return 200 + p.pos*0.001;
+}
+function jitterOrder(order){
+  const a=[...order];
+  for(let i=0;i<a.length-1;i++){
+    if(Math.random()<0.3){ const tmp=a[i]; a[i]=a[i+1]; a[i+1]=tmp; }
+  }
+  return a;
+}
+function isValidSet(set, thresholdIdx){
+  for(let i=0;i<set.length;i++){
+    for(let j=i+1;j<set.length;j++){
+      const r = meetRound(set[i].pos, set[j].pos);
+      if(r!==null && r<thresholdIdx) return false;
+    }
+  }
+  return true;
+}
+function shuffleArray(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const tmp=a[i]; a[i]=a[j]; a[j]=tmp; }
+  return a;
+}
+function tryNearbyVariant(thresholdIdx){
+  if(!lastSuggested || lastSuggested.length!==9) return null;
+  const currentSet = lastSuggested.map(pos=>players.find(p=>p.pos===pos)).filter(Boolean);
+  if(currentSet.length!==9) return null;
+  const outside = players.filter(p=>!lastSuggested.includes(p.pos));
+  let best = null, bestScore = Infinity;
+  for(const removeP of currentSet){
+    const remaining = currentSet.filter(p=>p!==removeP);
+    for(const cand of outside){
+      const trial = [...remaining, cand];
+      if(!isValidSet(trial, thresholdIdx)) continue;
+      const score = trial.reduce((s,p)=>s+playerPriority(p), 0);
+      if(score < bestScore){ bestScore = score; best = trial; }
+    }
+  }
+  return best;
+}
+function suggestLineup(){
+  if(players.length<9){ alert(T().suggestNeedNine); return; }
+  const thresholdIdx = +document.getElementById('clashThreshold').value;
+
+  const variant = tryNearbyVariant(thresholdIdx);
+  if(variant){
+    replacingPos = null;
+    lastSuggested = variant.map(p=>p.pos);
+    selected = lastSuggested.slice();
+    renderList(); renderGrid(); renderResults();
+    alert(T().suggestVariant);
+    return;
+  }
+
+  const base = [...players].sort((a,b)=>playerPriority(a)-playerPriority(b));
+  function attempt(order){
+    const set=[];
+    for(const p of order){
+      if(set.length>=9) break;
+      const ok = set.every(s=>{ const r=meetRound(p.pos,s.pos); return r===null || r>=thresholdIdx; });
+      if(ok) set.push(p);
+    }
+    return set;
+  }
+  let best = attempt(base);
+  for(let i=0;i<300 && best.length<9;i++){
+    const trial = attempt(jitterOrder(base));
+    if(trial.length>best.length) best=trial;
+  }
+  replacingPos = null;
+  selected = best.map(p=>p.pos);
+  lastSuggested = best.length===9 ? selected.slice() : null;
+  renderList(); renderGrid(); renderResults();
+  if(best.length<9){ alert(T().suggestPartial(best.length)); }
+  else{ alert(T().suggestSuccess); }
+}
+function computeSummary(selArr){
+  let cleanCount=0, nearestRound=null;
+  selArr.forEach(pos=>{
+    const clashes = selArr.filter(o=>o!==pos).map(o=>meetRound(pos,o)).filter(r=>r!==null);
+    if(clashes.length===0) cleanCount++;
+    clashes.forEach(r=>{ if(nearestRound===null||r<nearestRound) nearestRound=r; });
+  });
+  return {cleanCount, nearestRound, total:selArr.length};
+}
+
+function importJSON(){
+  try{
+    const data = JSON.parse(document.getElementById('jsonImport').value);
+    players = data.map(p=>({name:p.name,pos:+p.pos,seed:p.seed??null,surfaceScore:(p.surfaceScore===undefined?null:p.surfaceScore)}));
+    selected = [];
+    currentLibId = null;
+    document.getElementById('selectCard').style.display='block';
+    document.getElementById('gridCard').style.display='block';
+    document.getElementById('saveLibBtn').style.display='flex';
+    lastSuggested = null;
+    populateThresholdOptions();
+    renderList(); renderGrid(); renderResults();
+  }catch(e){ alert('JSON parse error'); }
+}
+
+function loadLibrary(){
+  try{ const raw = localStorage.getItem('dcc_library'); library = raw ? JSON.parse(raw) : []; }catch(e){ library = []; }
+}
+function persistLibrary(){ try{ localStorage.setItem('dcc_library', JSON.stringify(library)); }catch(e){} }
+
+function saveToLibrary(){
+  const name = document.getElementById('tName').value.trim();
+  if(!name){ alert(T().enterName); return; }
+  const entry = {
+    id: currentLibId || (Date.now()+''),
+    name, surface: document.getElementById('tSurface').value, size: drawSize(),
+    players, selected, savedAt: Date.now(), type: 'tournament'
+  };
+  const idx = library.findIndex(l=>l.id===entry.id);
+  if(idx>=0) library[idx]=entry; else library.push(entry);
+  currentLibId = entry.id;
+  persistLibrary();
+  renderLibrary();
+}
+function openLibraryItem(id){
+  const entry = library.find(l=>l.id===id);
+  if(!entry) return;
+  players = entry.players; selected = entry.selected; currentLibId = entry.id;
+  document.getElementById('tName').value = entry.name;
+  document.getElementById('tSurface').value = entry.surface;
+  document.getElementById('tSize').value = entry.size;
+  document.getElementById('selectCard').style.display='block';
+  document.getElementById('gridCard').style.display='block';
+  document.getElementById('saveLibBtn').style.display='flex';
+  replacingPos = null;
+  lastSuggested = null;
+  populateThresholdOptions();
+  renderList(); renderGrid(); renderResults();
+}
+function deleteLibraryItem(id, ev){
+  ev.stopPropagation();
+  if(!confirm(T().confirmDelete)) return;
+  library = library.filter(l=>l.id!==id);
+  if(currentLibId===id) currentLibId=null;
+  persistLibrary();
+  renderLibrary();
+}
+function toggleLibSection(section){
+  libSectionOpen[section] = !libSectionOpen[section];
+  renderLibrary();
+}
+function libItemHtml(l){
+  return `<div class="lib-item" onclick="openLibraryItem('${l.id}')">
+    <div class="lib-info">
+      <div class="lib-name">${l.name}</div>
+      <div class="lib-meta">${l.surface} · ${l.size} · ${l.selected.length}/9</div>
+    </div>
+    <button class="lib-del" onclick="deleteLibraryItem('${l.id}', event)">×</button>
+  </div>`;
+}
+function renderLibrary(){
+  const t = T();
+  const tournaments = library.filter(l=>l.type!=='lineup').sort((a,b)=>b.savedAt-a.savedAt);
+  const lineups = library.filter(l=>l.type==='lineup').sort((a,b)=>b.savedAt-a.savedAt);
+
+  document.getElementById('tourCount').textContent = tournaments.length;
+  document.getElementById('lineCount').textContent = lineups.length;
+
+  const tourList = document.getElementById('tourList');
+  const lineList = document.getElementById('lineList');
+  if(tourList){
+    tourList.classList.toggle('open', libSectionOpen.tournaments);
+    document.getElementById('tourArrow').textContent = libSectionOpen.tournaments ? '▴' : '▾';
+    tourList.innerHTML = tournaments.length ? tournaments.map(libItemHtml).join('') : `<div class="empty-hint">${t.noTournaments}</div>`;
+  }
+  if(lineList){
+    lineList.classList.toggle('open', libSectionOpen.lineups);
+    document.getElementById('lineArrow').textContent = libSectionOpen.lineups ? '▴' : '▾';
+    lineList.innerHTML = lineups.length ? lineups.map(libItemHtml).join('') : `<div class="empty-hint">${t.noLineups}</div>`;
+  }
+}
+function clearSelection(){
+  replacingPos = null;
+  lastSuggested = null;
+  selected = [];
+  renderList(); renderGrid(); renderResults();
+}
+
+function toggleSelect(pos){
+  if(replacingPos!==null){
+    if(pos===replacingPos){ replacingPos=null; renderList(); return; }
+    const idx = selected.indexOf(replacingPos);
+    if(idx>=0 && !selected.includes(pos)){ selected[idx]=pos; }
+    replacingPos = null;
+    renderList(); renderGrid(); renderResults();
+    return;
+  }
+  const idx = selected.indexOf(pos);
+  if(idx>=0) selected.splice(idx,1);
+  else{ if(selected.length>=9) return; selected.push(pos); }
+  renderList(); renderGrid(); renderResults();
+}
+function startReplace(pos){
+  replacingPos = (replacingPos===pos) ? null : pos;
+  renderList();
+}
+function buildRowHtml(p, baseSummary){
+  const isSel = selected.includes(p.pos);
+  const slotNum = isSel ? selected.indexOf(p.pos)+1 : '';
+  let deltaHtml = '';
+  let rowClass = isSel?'selected':'';
+  if(replacingPos!==null && !isSel){
+    rowClass += ' candidate';
+    const trial = selected.map(x=>x===replacingPos?p.pos:x);
+    const s2 = computeSummary(trial);
+    const diff = s2.cleanCount - baseSummary.cleanCount;
+    const cls = diff>0?'up':(diff<0?'down':'same');
+    const sign = diff>0?'+':'';
+    deltaHtml = `<span class="delta ${cls}">${sign}${diff} · ${s2.cleanCount}/${s2.total}</span>`;
+  }
+  const swapBtn = isSel ? `<button class="swapbtn ${replacingPos===p.pos?'active':''}" onclick="event.stopPropagation();startReplace(${p.pos})">⇄</button>` : '';
+  return `<div class="prow ${rowClass}" data-pos="${p.pos}" onclick="toggleSelect(${p.pos})">
+    <span class="pos">#${p.pos}</span><span class="nm">${p.name}</span>
+    <span class="sd">${p.seed?'#'+p.seed:''}</span>
+    ${deltaHtml}
+    ${swapBtn}
+    <span class="badge ${isSel?'':'empty'}">${slotNum}</span></div>`;
+}
+function setListView(v){
+  listView = v;
+  document.getElementById('viewFlatBtn').classList.toggle('active', v==='flat');
+  document.getElementById('viewBracketBtn').classList.toggle('active', v==='bracket');
+  renderList();
+}
+function jumpToPosition(){
+  const val = +document.getElementById('jumpBox').value;
+  if(!val) return;
+  const list = document.getElementById('playerList');
+  let target = list.querySelector(`[data-pos="${val}"]`);
+  if(!target){
+    let closest = null, closestDiff = Infinity;
+    players.forEach(p=>{ const d = Math.abs(p.pos-val); if(d<closestDiff){ closestDiff=d; closest=p.pos; } });
+    if(closest!==null) target = list.querySelector(`[data-pos="${closest}"]`);
+  }
+  if(target){
+    target.scrollIntoView({block:'center', behavior:'smooth'});
+    target.classList.add('flash');
+    setTimeout(()=>target.classList.remove('flash'), 1200);
+  } else {
+    alert(T().notFound);
+  }
+}
+function renderList(){
+  const q = (document.getElementById('searchBox')?.value||'').toLowerCase();
+  document.getElementById('selCount').textContent = selected.length+' / 9';
+  const list = document.getElementById('playerList');
+  const sorted = [...players].sort((a,b)=>a.pos-b.pos);
+  const baseSummary = computeSummary(selected);
+  const filtered = sorted.filter(p=>p.name.toLowerCase().includes(q));
+
+  if(listView==='flat' || q){
+    list.innerHTML = filtered.map(p=>buildRowHtml(p, baseSummary)).join('');
+    return;
+  }
+
+  const size = drawSize();
+  const half = size/2;
+  const byPos = {};
+  players.forEach(p=>{ byPos[p.pos]=p; });
+  const filteredPos = new Set(filtered.map(p=>p.pos));
+  function buildHalfHtml(from, to){
+    let html = '';
+    for(let i=from; i<=to; i+=2){
+      const p1 = byPos[i], p2 = byPos[i+1];
+      if(!p1 && !p2) continue;
+      if(!filteredPos.has(p1?.pos) && !filteredPos.has(p2?.pos)) continue;
+      html += '<div class="pair-box">';
+      if(p1) html += buildRowHtml(p1, baseSummary);
+      if(p2) html += buildRowHtml(p2, baseSummary);
+      html += '</div>';
+    }
+    return html;
+  }
+  const upperHtml = buildHalfHtml(1, half);
+  const lowerHtml = buildHalfHtml(half+1, size);
+  list.innerHTML = `<div class="half-label">${T().upperHalf}</div>${upperHtml}<div class="half-label">${T().lowerHalf}</div>${lowerHtml}`;
+}
+function renderGrid(){
+  const grid = document.getElementById('gridView');
+  const sorted = [...players].sort((a,b)=>a.pos-b.pos);
+  const lineupFull = selected.length>=9;
+  grid.innerHTML = sorted.map(p=>{
+    const isSel = selected.includes(p.pos);
+    const short = getSurname(p.name).slice(0,7);
+    let cls = 'gcell';
+    let style = '';
+    if(isSel){
+      cls += ' selected';
+      const others = selected.filter(x=>x!==p.pos);
+      let best=null;
+      others.forEach(o=>{ const r=meetRound(p.pos,o); if(r!==null && (best===null||r<best)) best=r; });
+      const color = best!==null ? roundColor(best) : 'var(--accent)';
+      style = `background:${color};border-color:${color}`;
+    } else if(selected.length>0){
+      cls += ' candidate';
+      let best=null;
+      selected.forEach(o=>{ const r=meetRound(p.pos,o); if(r!==null && (best===null||r<best)) best=r; });
+      const color = best!==null ? roundColor(best) : 'var(--accent)';
+      style = `border-color:${color};color:${color}`;
+      if(lineupFull) cls += ' full';
+    } else if(lineupFull){
+      cls += ' full';
+    }
+    return `<div class="${cls}" style="${style}" title="${p.name}" onclick="toggleSelect(${p.pos})">${p.pos}<br>${short}</div>`;
+  }).join('');
+}
+function renderResults(){
+  const wrap = document.getElementById('cardsWrap');
+  const card = document.getElementById('resultCard');
+  if(selected.length===0){ card.style.display='none'; document.getElementById('compareCard').style.display='none'; return; }
+  card.style.display='block';
+  document.getElementById('compareCard').style.display='block';
+  const names = roundNames();
+  const selPlayers = selected.map(pos=>players.find(p=>p.pos===pos));
+  const s = computeSummary(selected);
+  const summary = document.getElementById('summaryBox');
+  const summaryColor = s.nearestRound===null ? 'var(--accent)' : roundColor(s.nearestRound);
+  summary.innerHTML = `<span>${cleanCountText(s.cleanCount, s.total)}</span><b style="color:${summaryColor}">${s.nearestRound===null? noneAtAllText() : nearestText()+': '+names[s.nearestRound]}</b>`;
+  wrap.innerHTML = selPlayers.map(p=>{
+    const clashes = selPlayers.filter(o=>o.pos!==p.pos).map(o=>{ const r = meetRound(p.pos,o.pos); return r!==null ? {name:o.name, round:r} : null; }).filter(Boolean).sort((a,b)=>a.round-b.round);
+    const surfHtml = p.surfaceScore!==null ? `<div class="surf-bar"><div class="surf-fill" style="width:${p.surfaceScore}%"></div></div>` : `<div class="pcard-meta" style="margin-top:6px">${T().noData}</div>`;
+    const clashHtml = clashes.length ? `<div class="clash-list">${clashes.map(c=>`<div class="clash-tag" style="background:${roundColor(c.round)}22;color:${roundColor(c.round)}"><span>${c.name}</span><span>${names[c.round]}</span></div>`).join('')}</div>` : `<div class="clean-tag">${noClashText()}</div>`;
+    return `<div class="pcard"><div class="pcard-head"><div class="pcard-name">${p.name}</div><div class="pcard-meta">#${p.pos}${p.seed?' #'+p.seed:''}</div></div>${surfHtml}${clashHtml}</div>`;
+  }).join('');
+}
+
+function saveCompareSlot(slot){
+  if(selected.length!==9){ alert(T().needNine); return; }
+  compareSlots[slot] = { players: selected.map(pos=>players.find(p=>p.pos===pos)), summary: computeSummary(selected) };
+  renderCompare();
+}
+function renderCompare(){
+  const wrap = document.getElementById('compareResult');
+  if(!wrap) return;
+  const A = compareSlots.A, B = compareSlots.B;
+  if(!A && !B){ wrap.innerHTML=''; return; }
+  const names = roundNames();
+  function slotSummaryHtml(s, label){
+    if(!s) return `<div class="cmp-col"><h3>${label}</h3><div class="empty-hint">—</div></div>`;
+    const color = s.summary.nearestRound===null ? 'var(--accent)' : roundColor(s.summary.nearestRound);
+    const posList = s.players.map(p=>p.pos);
+    const otherList = label==='A' ? (B?B.players.map(p=>p.pos):[]) : (A?A.players.map(p=>p.pos):[]);
+    const rows = s.players.slice().sort((a,b)=>a.pos-b.pos).map(p=>{
+      const inOther = otherList.includes(p.pos);
+      return `<div class="cmp-player ${inOther?'common':'only'}">${p.name}${inOther?'':' •'}</div>`;
+    }).join('');
+    return `<div class="cmp-col"><h3>${label}</h3>
+      <div style="margin-bottom:6px">${cleanCountText(s.summary.cleanCount, 9)}<br><b style="color:${color}">${s.summary.nearestRound===null?noneAtAllText():names[s.summary.nearestRound]}</b></div>
+      ${rows}</div>`;
+  }
+  wrap.innerHTML = `<div class="cmp-row">${slotSummaryHtml(A,'A')}${slotSummaryHtml(B,'B')}</div>`;
+  const libRow = document.getElementById('compareLibRow');
+  if(libRow){
+    libRow.style.display = (A||B) ? 'flex' : 'none';
+    document.getElementById('libBtnA').style.display = A ? 'block' : 'none';
+    document.getElementById('libBtnB').style.display = B ? 'block' : 'none';
+  }
+}
+function saveCompareSlotToLibrary(slot){
+  const snap = compareSlots[slot];
+  if(!snap) return;
+  const baseName = document.getElementById('tName').value.trim() || 'Tournament';
+  const suggested = baseName + ' — ' + slot;
+  const name = prompt(T().nameForVariant, suggested);
+  if(!name) return;
+  const entry = {
+    id: Date.now()+'_'+slot,
+    name, surface: document.getElementById('tSurface').value, size: drawSize(),
+    players, selected: snap.players.map(p=>p.pos), savedAt: Date.now(), type: 'lineup'
+  };
+  library.push(entry);
+  persistLibrary();
+  renderLibrary();
+  alert(T().savedToLibrary);
+}
+
+document.addEventListener('click', (e)=>{ if(!e.target.closest('.langsel')) document.getElementById('langMenu').classList.remove('open'); });
+document.getElementById('tSize').addEventListener('change', ()=>{ populateThresholdOptions(); renderGrid(); renderResults(); renderCompare(); });
+
+loadLibrary();
+currentLang = detectInitialLang();
+applyI18n();
+</script>
+</body>
+</html>
