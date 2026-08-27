@@ -954,7 +954,25 @@ function playerFactorsDebugText(p){
   if(!f) return `${T().noData} (ключ: ${key})`;
   const score = compositeScore(f);
   const pct = v => (v*100).toFixed(0)+'%';
-  return `Рейтинг ${pct(f.rankScore)} (#${f.rank??'?'}) · Форма ${pct(f.formScore)} · Покрытие ${pct(f.surfaceScoreV)} · W/L ${pct(f.winLossScore)} · Турниры ${pct(f.tourneyScore)} · Итог ${pct(score)} · ключ: ${key}`;
+  let text = `Рейтинг ${pct(f.rankScore)} (#${f.rank??'?'}) · Форма ${pct(f.formScore)} · Покрытие ${pct(f.surfaceScoreV)} · W/L ${pct(f.winLossScore)} · Турниры ${pct(f.tourneyScore)} · Итог ${pct(score)} · ключ: ${key}`;
+  // H2H isn't part of compositeScore (it's pairwise, not a property of one
+  // player), so it can't sit in the list above as a "7th factor" without
+  // being misleading. Show it only against players actually in the current
+  // lineup — that's the context where it's meaningful — and only when
+  // there's real head-to-head history, not a noisy "0/0" for every pair.
+  if(selected.length){
+    const h2hParts = [];
+    selected.forEach(pos=>{
+      if(pos===p.pos) return;
+      const opp = players.find(x=>x.pos===pos);
+      if(!opp) return;
+      const oppKey = resolveStatsKey(opp.name);
+      const list = (statsIndex[key]||[]).filter(m=>m.opp===oppKey);
+      if(list.length) h2hParts.push(`${opp.name} ${list.filter(m=>m.win).length}/${list.length}`);
+    });
+    if(h2hParts.length) text += ` · H2H: ${h2hParts.join(', ')}`;
+  }
+  return text;
 }
 function togglePlayerDebug(pos){
   const el = document.getElementById('dbg-'+pos);
