@@ -427,82 +427,11 @@ function statsKey(name){
 // surname + same first-initial) — the archive format simply can't tell them
 // apart. We can't fix that, but we CAN detect it among the user's own 9
 // selected players and say so, instead of silently merging their stats.
-// The JSON import from tennistemple.com (via the copyable prompt) gives
-// player names as UKRAINIAN TRANSLITERATION OF THE SURNAME ONLY — no given
-// name, no initial. E.g. "Джокович" for Djokovic, "Черундоло" for Cerundolo.
-// This is a fundamentally different shape from the Latin "Given Surname" or
-// "Surname I." formats above, and needs its own path: (1) transliterate
-// Cyrillic -> Latin, (2) treat the WHOLE string as the surname (no
-// given-name splitting — there is no given name to split off), (3) fuzzy-
-// match against the archive's surnames, because literal transliteration
-// routinely disagrees with the player's actual Latin spelling (phonetic
-// "Cherundolo" vs actual "Cerundolo", "Alkaras" vs actual "Alcaraz").
-const CYR_TO_LAT = {
-  'а':'a','б':'b','в':'v','г':'h','ґ':'g','д':'d','е':'e','є':'ie','ж':'zh',
-  'з':'z','и':'y','і':'i','ї':'i','й':'i','к':'k','л':'l','м':'m','н':'n',
-  'о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts',
-  'ч':'ch','ш':'sh','щ':'shch','ь':'','ю':'iu','я':'ia',
-  'ы':'y','э':'e','ъ':'' // Russian-only letters, in case of a mixed-source copy-paste
-};
-function isCyrillic(str){ return /[а-яіїєґА-ЯІЇЄҐ]/.test(str); }
-function transliterateCyrillic(str){
-  const stripped = str.normalize('NFD').replace(/[\u0300-\u036f]/g,'') // drop stray stress marks etc.
-    .toLowerCase()
-    .replace(/дж/g,'dj'); // "Джокович" -> "Djokovic", not the generic "Dzhokovych" — real ATP spelling wins over the phonetic rule
-  return stripped.split('').map(ch => CYR_TO_LAT[ch]!==undefined ? CYR_TO_LAT[ch] : ch).join('');
-}
-// The key used for cross-name comparison / collision detection. For Cyrillic
-// input this is the folded transliterated surname (no initial — we don't
-// have one); for Latin input it's the existing surname+initial statsKey.
-function effectiveMatchKey(name){
-  if(isCyrillic(name)){
-    return foldDiacritics(transliterateCyrillic(name)).toLowerCase().replace(/[^a-z]/g,'');
-  }
-  return statsKey(name);
-}
-function levenshtein(a, b){
-  const m=a.length, n=b.length;
-  if(m===0) return n; if(n===0) return m;
-  const dp = new Array(n+1);
-  for(let j=0;j<=n;j++) dp[j]=j;
-  for(let i=1;i<=m;i++){
-    let prev = dp[0]; dp[0] = i;
-    for(let j=1;j<=n;j++){
-      const tmp = dp[j];
-      dp[j] = a[i-1]===b[j-1] ? prev : 1+Math.min(prev, dp[j], dp[j-1]);
-      prev = tmp;
-    }
-  }
-  return dp[n];
-}
-// Given a group of archive keys that share one surname spelling (e.g. two
-// different initials because two tour players have that surname), pick the
-// one with the most matches on record — a proxy for "the player who's
-// actually on tour this season" over a one-off qualifier — and flag it as
-// ambiguous so the UI can warn rather than silently guess.
-function pickBestFromSurnameGroup(group){
-  let bestKey=null, bestCount=-1;
-  const entries = Object.entries(group);
-  entries.forEach(([k,c])=>{ if(c>bestCount){ bestCount=c; bestKey=k; } });
-  return { key: bestKey, ambiguous: entries.length>1 };
-}
-function fuzzyResolveSurnameKey(surnameFolded){
-  if(!statsSurnameIndex || !surnameFolded) return null;
-  if(statsSurnameIndex[surnameFolded]) return pickBestFromSurnameGroup(statsSurnameIndex[surnameFolded]);
-  let best=null, bestDist=Infinity;
-  const maxDist = Math.max(2, Math.floor(surnameFolded.length*0.25));
-  Object.keys(statsSurnameIndex).forEach(cand=>{
-    const d = levenshtein(surnameFolded, cand);
-    if(d<bestDist && d<=maxDist){ bestDist=d; best=cand; }
-  });
-  if(best===null) return null;
-  return pickBestFromSurnameGroup(statsSurnameIndex[best]);
-}
 function findStatsKeyCollisions(playerList){
   const byKey = {};
   (playerList||[]).forEach(p=>{
     if(!p || !p.name) return;
-    const k = effectiveMatchKey(p.name);
+    const k = statsKey(p.name);
     if(!k) return;
     (byKey[k] = byKey[k]||[]).push(p.name);
   });
@@ -526,52 +455,24 @@ function statsKeyCandidates(name){
   }
   return candidates;
 }
-// resolveStatsKey does a real amount of work per call — fuzzy Levenshtein
-// scans over the whole archive for Cyrillic names in particular — and gets
-// called many times over for the SAME name across a single render (every
-// pairwise comparison in computeReachProbabilities) and across repeated
-// renders (every click). Its result only depends on (name, statsIndex,
-// statsSurnameIndex), which only change when new stats load, so caching is
-// safe and turns an O(n^2 * archive size) render into a one-time cost per
-// name. Measured ~150ms -> ~15ms on a synthetic 128-draw with a 400-player
-// archive and half the field needing fuzzy Cyrillic lookups.
+// resolveStatsKey does a real amount of work per call (statsKeyCandidates
+// parsing) and gets called many times over for the SAME name across a
+// single render (every pairwise comparison in computeReachProbabilities)
+// and across repeated renders (every click). Its result only depends on
+// (name, statsIndex), which only changes when new stats load, so caching
+// is safe and turns a repeated O(n^2) render cost into a one-time cost per
+// name.
 let resolveStatsKeyCache = new Map();
 function resolveStatsKey(name){
   if(resolveStatsKeyCache.has(name)) return resolveStatsKeyCache.get(name);
-  let result;
-  if(isCyrillic(name)){
-    const surnameFolded = foldDiacritics(transliterateCyrillic(name)).toLowerCase().replace(/[^a-z]/g,'');
-    const res = fuzzyResolveSurnameKey(surnameFolded);
-    if(res && res.key && statsIndex && statsIndex[res.key] && statsIndex[res.key].length) result = res.key;
-    else result = surnameFolded; // no archive match — downstream lookups just return null cleanly
-  } else {
-    const candidates = statsKeyCandidates(name);
-    const hit = statsIndex ? candidates.find(k=>statsIndex[k] && statsIndex[k].length) : null;
-    result = hit || candidates[0];
-  }
+  const candidates = statsKeyCandidates(name);
+  const hit = statsIndex ? candidates.find(k=>statsIndex[k] && statsIndex[k].length) : null;
+  const result = hit || candidates[0];
   resolveStatsKeyCache.set(name, result);
   return result;
 }
 let statsIndex = null;
-let statsSurnameIndex = null;
 let statsMeta = null;
-// Surname-only index of the archive (folded surname -> {fullKey: matchCount}),
-// used for the Cyrillic fuzzy-match path above. Separate from statsIndex
-// because that one's keyed by surname+initial, which we don't have here.
-function buildSurnameIndex(matches){
-  const idx = {};
-  function record(rawName){
-    if(!rawName) return;
-    const {surnameTokens, initial} = parseNameParts(rawName);
-    const surnameFolded = foldDiacritics(surnameTokens.join('')).toLowerCase().replace(/[^a-z]/g,'');
-    if(!surnameFolded) return;
-    const key = surnameFolded + initial.toLowerCase();
-    if(!idx[surnameFolded]) idx[surnameFolded] = {};
-    idx[surnameFolded][key] = (idx[surnameFolded][key]||0) + 1;
-  }
-  matches.forEach(m=>{ record(m.winner); record(m.loser); });
-  return idx;
-}
 function buildStatsIndex(matches){
   const idx = {};
   matches.forEach(m=>{
@@ -717,7 +618,6 @@ async function ensureStatsLoaded(){
       const parsed = JSON.parse(cached);
       if(Date.now()-parsed.fetchedAt < 12*3600*1000){
         statsIndex = buildStatsIndex(parsed.matches);
-        statsSurnameIndex = buildSurnameIndex(parsed.matches);
         statsMeta = {tour, year, fetchedAt:parsed.fetchedAt, count:parsed.matches.length};
         updateStatsStatusUI();
         return true;
@@ -731,13 +631,12 @@ async function ensureStatsLoaded(){
     if(!resp.ok) throw new Error('bad response');
     const data = await resp.json();
     statsIndex = buildStatsIndex(data.matches);
-    statsSurnameIndex = buildSurnameIndex(data.matches);
     statsMeta = {tour, year, fetchedAt: Date.now(), count: data.matches.length};
     try{ localStorage.setItem(cacheKey, JSON.stringify({matches:data.matches, fetchedAt:statsMeta.fetchedAt})); }catch(e){}
     updateStatsStatusUI();
     return true;
   }catch(e){
-    statsIndex = null; statsSurnameIndex = null; statsMeta = null;
+    statsIndex = null; statsMeta = null;
     if(statusEl) statusEl.textContent = T().statsFailed;
     return false;
   }
@@ -762,13 +661,6 @@ function playerPriority(p){
   if(p.seed!=null) return 50 + p.seed*0.1;
   return 200 + p.pos*0.001;
 }
-function jitterOrder(order){
-  const a=[...order];
-  for(let i=0;i<a.length-1;i++){
-    if(Math.random()<0.3){ const tmp=a[i]; a[i]=a[i+1]; a[i+1]=tmp; }
-  }
-  return a;
-}
 function isValidSet(set, thresholdIdx){
   for(let i=0;i<set.length;i++){
     for(let j=i+1;j<set.length;j++){
@@ -777,11 +669,6 @@ function isValidSet(set, thresholdIdx){
     }
   }
   return true;
-}
-function shuffleArray(arr){
-  const a=[...arr];
-  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const tmp=a[i]; a[i]=a[j]; a[j]=tmp; }
-  return a;
 }
 function tryNearbyVariant(thresholdIdx){
   if(!lastSuggested || lastSuggested.length!==9) return null;
