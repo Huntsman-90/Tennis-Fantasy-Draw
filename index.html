@@ -597,7 +597,8 @@ function updateStatsStatusUI(){
   if(!statsMeta){ el.textContent = T().statsNotLoaded; return; }
   const ageMin = Math.round((Date.now()-statsMeta.fetchedAt)/60000);
   const ageText = ageMin<60 ? `${ageMin} мин` : `${Math.round(ageMin/60)} ч`;
-  el.textContent = `${statsMeta.tour.toUpperCase()} ${statsMeta.year} · ${statsMeta.count} матчей · ${ageText}`;
+  const yearLabel = statsMeta.yearFrom===statsMeta.yearTo ? `${statsMeta.yearTo}` : `${statsMeta.yearFrom}–${statsMeta.yearTo}`;
+  el.textContent = `${statsMeta.tour.toUpperCase()} ${yearLabel} · ${statsMeta.count} матчей · ${ageText}`;
   const collisions = findStatsKeyCollisions(players);
   if(collisions.length){
     const warn = document.createElement('span');
@@ -607,39 +608,60 @@ function updateStatsStatusUI(){
     el.appendChild(warn);
   }
 }
-async function ensureStatsLoaded(){
-  resolveStatsKeyCache.clear(); // stats archive (and therefore every name resolution) is about to change
-  const tour = document.getElementById('tTour')?.value || 'atp';
-  const year = new Date().getFullYear();
+// Early in a new season there are only a handful of matches in that year's
+// archive file — not enough for form/surface/H2H to mean anything. Pooling
+// the last few seasons together fixes the cold-start problem: "last 10
+// matches" (form/tourney factors) and surface/H2H filters just draw from a
+// richer, still recency-sorted pool instead of only the year's remainder.
+// One real tradeoff: winLossScore (MALAGA_WEIGHTS.winLoss) now reflects a
+// multi-season rate rather than just this season's — a reasonable signal in
+// its own right, but worth knowing it changed meaning, not just "more data".
+const STATS_YEARS_BACK = 2; // + current year = 3 seasons pooled. Adjust here if more/less history is wanted.
+async function fetchYearMatches(tour, year, isCurrentYear){
   const cacheKey = `dcc_stats_${tour}_${year}`;
+  // A completed season's file never changes again, so it can be cached far
+  // longer than the in-progress current year (still 12h, as before).
+  const ttl = isCurrentYear ? 12*3600*1000 : 30*24*3600*1000;
   try{
     const cached = localStorage.getItem(cacheKey);
     if(cached){
       const parsed = JSON.parse(cached);
-      if(Date.now()-parsed.fetchedAt < 12*3600*1000){
-        statsIndex = buildStatsIndex(parsed.matches);
-        statsMeta = {tour, year, fetchedAt:parsed.fetchedAt, count:parsed.matches.length};
-        updateStatsStatusUI();
-        return true;
-      }
+      if(Date.now()-parsed.fetchedAt < ttl) return {matches: parsed.matches, ok:true};
     }
   }catch(e){}
-  const statusEl = document.getElementById('statsStatus');
-  if(statusEl) statusEl.textContent = T().statsLoading;
   try{
     const resp = await fetch(`/api/stats?tour=${tour}&year=${year}`);
-    if(!resp.ok) throw new Error('bad response');
+    if(!resp.ok) return {matches: [], ok:false};
     const data = await resp.json();
-    statsIndex = buildStatsIndex(data.matches);
-    statsMeta = {tour, year, fetchedAt: Date.now(), count: data.matches.length};
-    try{ localStorage.setItem(cacheKey, JSON.stringify({matches:data.matches, fetchedAt:statsMeta.fetchedAt})); }catch(e){}
-    updateStatsStatusUI();
-    return true;
+    try{ localStorage.setItem(cacheKey, JSON.stringify({matches:data.matches, fetchedAt:Date.now()})); }catch(e){}
+    return {matches: data.matches, ok:true};
   }catch(e){
+    return {matches: [], ok:false};
+  }
+}
+async function ensureStatsLoaded(){
+  resolveStatsKeyCache.clear(); // stats archive (and therefore every name resolution) is about to change
+  const tour = document.getElementById('tTour')?.value || 'atp';
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for(let i=0;i<=STATS_YEARS_BACK;i++) years.push(currentYear-i);
+  const statusEl = document.getElementById('statsStatus');
+  if(statusEl) statusEl.textContent = T().statsLoading;
+  const results = await Promise.all(years.map(y=>fetchYearMatches(tour, y, y===currentYear)));
+  const allMatches = [];
+  const succeededYears = [];
+  results.forEach((r,i)=>{ if(r.ok && r.matches.length){ allMatches.push(...r.matches); succeededYears.push(years[i]); } });
+  if(!succeededYears.length){
     statsIndex = null; statsMeta = null;
     if(statusEl) statusEl.textContent = T().statsFailed;
     return false;
   }
+  statsIndex = buildStatsIndex(allMatches);
+  // yearFrom/yearTo reflect only the years that actually loaded, not the
+  // requested range — a year that failed to fetch shouldn't be implied as covered.
+  statsMeta = {tour, yearFrom: Math.min(...succeededYears), yearTo: Math.max(...succeededYears), fetchedAt: Date.now(), count: allMatches.length};
+  updateStatsStatusUI();
+  return true;
 }
 function populateThresholdOptions(){
   const sel = document.getElementById('clashThreshold');
