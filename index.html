@@ -53,6 +53,7 @@
   .prow .nm{flex:1;font-weight:500}
   .prow .sd{font-family:var(--mono);color:var(--muted);font-size:11px}
   .dbgbtn{flex-shrink:0;background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;width:22px;height:22px;font-size:11px;line-height:1;cursor:pointer}
+  .dbgbtn-inline{flex-shrink:0;background:none;border:none;color:inherit;opacity:0.7;font-size:10px;line-height:1;cursor:pointer;padding:0 0 0 4px}
   .prow-debug{padding:6px 10px;font-family:var(--mono);font-size:10.5px;color:var(--muted);background:var(--surface-2);border-bottom:1px solid #1C2F3A;word-break:break-word}
   .badge{width:20px;height:20px;border-radius:50%;background:var(--accent);color:#0F1C24;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .badge.empty{background:var(--surface-2);border:1px solid var(--line)}
@@ -114,6 +115,8 @@
   .lib-section-btn{background:var(--surface-2);color:var(--accent);border:1px solid var(--line);width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:12.5px}
   .lib-section-btn .cnt{color:var(--muted);font-family:var(--mono);margin-left:auto;margin-right:8px}
   .stats-status{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:11.5px;color:var(--muted)}
+  .stats-collision-warn{cursor:pointer;text-decoration:underline dotted}
+  .stats-collision-details{margin-top:6px;padding:7px 8px;font-size:11px;color:var(--warn);background:rgba(255,122,99,0.08);border-radius:6px;word-break:break-word}
   .prob-badge{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:5px;margin-left:6px}
   .prob-badge.fav{background:rgba(199,255,107,0.15);color:var(--accent)}
   .prob-badge.dog{background:rgba(255,122,99,0.12);color:var(--warn)}
@@ -613,9 +616,16 @@ function clashProbabilityAtRound(reach, posA, posB, round){
   if(rA===undefined || rB===undefined) return null;
   return rA*rB;
 }
+function toggleStatsCollisionDetails(){
+  const el = document.getElementById('statsCollisionDetails');
+  if(!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
 function updateStatsStatusUI(){
   const el = document.getElementById('statsStatus');
   if(!el) return;
+  const existingDetails = document.getElementById('statsCollisionDetails');
+  if(existingDetails) existingDetails.remove();
   if(!statsMeta){ el.textContent = T().statsNotLoaded; return; }
   const ageMin = Math.round((Date.now()-statsMeta.fetchedAt)/60000);
   const ageText = ageMin<60 ? `${ageMin} мин` : `${Math.round(ageMin/60)} ч`;
@@ -626,8 +636,16 @@ function updateStatsStatusUI(){
     const warn = document.createElement('span');
     warn.className = 'stats-collision-warn';
     warn.textContent = ` ⚠ ${collisions.length}`;
-    warn.title = T().statsKeyCollision + ': ' + collisions.map(([,names])=>names.join(' / ')).join('; ');
+    // title/tooltip doesn't work on touch — same lesson as the R1 predictions
+    // list earlier in the project. Tap-to-reveal instead.
+    warn.onclick = (e)=>{ e.stopPropagation(); toggleStatsCollisionDetails(); };
     el.appendChild(warn);
+    const details = document.createElement('div');
+    details.id = 'statsCollisionDetails';
+    details.className = 'stats-collision-details';
+    details.style.display = 'none';
+    details.textContent = T().statsKeyCollision + ': ' + collisions.map(([,names])=>names.join(' / ')).join('; ');
+    el.parentNode.insertBefore(details, el.nextSibling);
   }
 }
 // Early in a new season there are only a handful of matches in that year's
@@ -974,11 +992,12 @@ function playerFactorsDebugText(p){
   }
   return text;
 }
-function togglePlayerDebug(pos){
-  const el = document.getElementById('dbg-'+pos);
+function toggleDebugEl(id){
+  const el = document.getElementById(id);
   if(!el) return;
   el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
+function togglePlayerDebug(pos){ toggleDebugEl('dbg-'+pos); }
 function buildRowHtml(p, baseSummary){
   const isSel = selected.includes(p.pos);
   const slotNum = isSel ? selected.indexOf(p.pos)+1 : '';
@@ -1161,6 +1180,7 @@ function renderResults(){
     const surfHtml = p.surfaceScore!==null ? `<div class="surf-bar"><div class="surf-fill" style="width:${p.surfaceScore}%"></div></div>` : `<div class="pcard-meta" style="margin-top:6px">${T().noData}</div>`;
     const clashHtml = clashes.length ? `<div class="clash-list">${clashes.map(c=>{
       let probBadge = '';
+      let dbgExtra = '';
       if(statsIndex && c.round===0){
         const prob = pairWinProbability(p.name, c.name, surface);
         if(prob!==null){
@@ -1174,10 +1194,16 @@ function renderResults(){
         const clashProb = clashProbabilityAtRound(reach, p.pos, c.pos, c.round);
         if(clashProb!==null){
           const pct = Math.round(clashProb*100);
-          probBadge = `<span class="prob-badge reach" title="${T().reachChanceTitle}">${pct}%</span>`;
+          probBadge = `<span class="prob-badge reach">${pct}%</span>`;
+          const rP = Math.round((reach[p.pos]?.[c.round]??0)*100);
+          const rC = Math.round((reach[c.pos]?.[c.round]??0)*100);
+          dbgExtra = `${p.name} доходит: ${rP}% × ${c.name} доходит: ${rC}% = ${pct}% шанс встречи · `;
         }
       }
-      return `<div class="clash-tag" style="background:${roundColor(c.round)}22;color:${roundColor(c.round)}"><span>${c.name}${probBadge}</span><span>${names[c.round]}</span></div>`;
+      const dbgId = `clashdbg-${p.pos}-${c.pos}`;
+      const dbgBtn = statsIndex ? `<button class="dbgbtn-inline" onclick="event.stopPropagation();toggleDebugEl('${dbgId}')">ⓘ</button>` : '';
+      const dbgDiv = statsIndex ? `<div class="prow-debug" id="${dbgId}" style="display:none">${escapeHtml(dbgExtra+playerFactorsDebugText(c))}</div>` : '';
+      return `<div class="clash-tag" style="background:${roundColor(c.round)}22;color:${roundColor(c.round)}"><span>${c.name}${probBadge}${dbgBtn}</span><span>${names[c.round]}</span></div>${dbgDiv}`;
     }).join('')}</div>` : `<div class="clean-tag">${noClashText()}</div>`;
     return `<div class="pcard"><div class="pcard-head"><div class="pcard-name">${p.name}</div><div class="pcard-meta">#${p.pos}${p.seed?' #'+p.seed:''}</div></div>${surfHtml}${clashHtml}</div>`;
   }).join('');
