@@ -1089,23 +1089,11 @@ function renderGrid(){
   const grid = document.getElementById('gridView');
   const sorted = [...players].sort((a,b)=>a.pos-b.pos);
   const lineupFull = selected.length>=9;
-  const surface = currentStatsSurface();
   grid.innerHTML = sorted.map(p=>{
     const isSel = selected.includes(p.pos);
     const short = getSurname(p.name).slice(0,7);
     let cls = 'gcell';
     let style = '';
-    let title = p.name;
-    if(statsIndex){
-      const partner = findR1Partner(p, players);
-      if(partner){
-        const prob = pairWinProbability(p.name, partner.name, surface);
-        if(prob!==null){
-          const pct = Math.round(prob*100);
-          title += ` — ${pct}% ${T().favShort||''} vs ${partner.name}`.trim();
-        }
-      }
-    }
     if(isSel){
       cls += ' selected';
       const others = selected.filter(x=>x!==p.pos);
@@ -1123,7 +1111,7 @@ function renderGrid(){
     } else if(lineupFull){
       cls += ' full';
     }
-    return `<div class="${cls}" style="${style}" title="${title}" onclick="toggleSelect(${p.pos})">${p.pos}<br>${short}</div>`;
+    return `<div class="${cls}" style="${style}" onclick="toggleSelect(${p.pos})">${p.pos}<br>${short}</div>`;
   }).join('');
   renderR1Predictions();
 }
