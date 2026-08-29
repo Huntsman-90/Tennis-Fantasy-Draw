@@ -178,6 +178,12 @@
   </div>
   <button style="margin-top:8px" onclick="loadFantasyPrices()" data-i18n="fantasyLoadBtn">💰 Загрузить цены</button>
   <div id="fantasyStatus" class="stats-status" style="margin-top:6px;display:none"></div>
+  <button class="btn-ghost" style="margin-top:8px" onclick="toggleFantasyManual()"><span data-i18n="fantasyManualToggle">Если автозагрузка не сработала — вставить вручную</span><span id="fantasyManualArrow">▾</span></button>
+  <div id="fantasyManualBody" style="display:none">
+    <label style="margin-top:6px" data-i18n="fantasyManualLabel">Цены (JSON: name + price, остальные поля не нужны)</label>
+    <textarea id="fantasyManualJson" placeholder='[{"name":"Aryna Sabalenka","price":15.0}, ...]'></textarea>
+    <button class="btn-main" onclick="importFantasyPricesManual()" data-i18n="fantasyManualImportBtn">Импортировать цены вручную</button>
+  </div>
   <label style="margin-top:10px" data-i18n="drawSize">Размер сетки</label>
   <select id="tSize">
     <option value="16">16</option><option value="28">28</option><option value="32" selected>32</option><option value="64">64</option><option value="128">128</option>
@@ -296,7 +302,8 @@ const BASE = {
   tour:"Тур", statsStatus:"Статистика", statsNotLoaded:"Не загружена", statsLoading:"Загрузка статистики...",
   statsFailed:"Не удалось загрузить — используется базовый приоритет",statsKeyCollision:"Возможное совпадение ключей игроков — статистика могла объединиться",showMore:(n)=>`Показать ещё ${n}`,showLess:"Свернуть",reachChanceTitle:"Шанс, что эта встреча вообще состоится (оба должны дойти до этого этапа)", favShort:"фав.", dogShort:"андердог",
   fantasyPriceLabel:"Ссылка на турнир tennisfantasy.cc",fantasyLoadBtn:"💰 Загрузить цены",enterFantasyUrl:"Сначала вставь ссылку на турнир",fantasyLoading:"Загрузка цен...",fantasyFailed:"Не удалось загрузить цены — см. консоль/ответ сервера",fantasyLoaded:"Цены загружены",
-  budgetEnable:"Учитывать бюджет",budgetNoPrices:"Сначала загрузи цены fantasy",budgetPartial:(n,cost,excluded)=>`Подобрано ${n} из 9 в рамках бюджета (${cost}M потрачено). ${excluded?excluded+' игрок(ов) без цены исключены из подбора.':''}`,budgetSuccess:(cost,cap,roundLabel)=>`Готово: 9 игроков, ${cost}M из ${cap}M бюджета.${roundLabel?' Ближайший вынужденный перетин: '+roundLabel+'.':' Без перетинов раньше выбранного этапа.'}`
+  budgetEnable:"Учитывать бюджет",budgetNoPrices:"Сначала загрузи цены fantasy",budgetPartial:(n,cost,excluded)=>`Подобрано ${n} из 9 в рамках бюджета (${cost}M потрачено). ${excluded?excluded+' игрок(ов) без цены исключены из подбора.':''}`,budgetSuccess:(cost,cap,roundLabel)=>`Готово: 9 игроков, ${cost}M из ${cap}M бюджета.${roundLabel?' Ближайший вынужденный перетин: '+roundLabel+'.':' Без перетинов раньше выбранного этапа.'}`,
+  fantasyManualToggle:"Если автозагрузка не сработала — вставить вручную",fantasyManualLabel:"Цены (JSON: name + price, остальные поля не нужны)",fantasyManualImportBtn:"Импортировать цены вручную",fantasyManualParseError:"Не удалось разобрать JSON — проверь формат",fantasyManualSource:"вручную"
 };
 const TR = {
   uk:{title:"Draw Clash Checker",subtitle:"Перевірка своєї дев'ятки: де по сітці вона перетинається сама з собою.",tournament:"Турнір",name:"Назва",surface:"Покриття",drawSize:"Розмір сітки",howTo:"Як отримати JSON?",jsonLabel:"JSON сітки",importBtn:"Імпортувати сітку",selection:"Вибір дев'ятки",selected:"Обрано",fullDraw:"Повна сітка",early:"Рання зустріч",mid:"Середній раунд",late:"Пізня зустріч",lineupResults:"Дев'ятка і перетини",disclaimer:"Лише структурний факт можливої зустрічі.",noData:"немає даних",copied:"Скопійовано",credit:"Створено Huntsman",myTournaments:"Мої турніри",libraryEmpty:"Поки немає збережених турнірів",saveToLibrary:"Зберегти в бібліотеку",enterName:"Спочатку введи назву турніру",swapHint:"Натисни ⇄ біля гравця, потім обери заміну у списку вище.",compareTitle:"Порівняння складів",saveAsA:"Запам'ятати як A",saveAsB:"Запам'ятати як B",onlyIn:"Лише в",both:"В обох",needNine:"Спочатку обери 9 гравців",confirmDelete:"Видалити цей турнір?",saveLibA:"💾 A в бібліотеку",saveLibB:"💾 B в бібліотеку",nameForVariant:"Назва для цього варіанту",savedToLibrary:"Збережено в бібліотеку",jumpPlaceholder:"Перейти до позиції №",jumpBtn:"Перейти",viewFlat:"Список",viewBracket:"По сітці",upperHalf:"Верхня половина сітки",lowerHalf:"Нижня половина сітки",notFound:"Позицію не знайдено",suggestBtn:"🎯 Підказати склад",noEarlierThan:"Не раніше",noClashAtAll:"Зовсім без перетинів",suggestSuccess:"Готово: дев'ятка без перетинів раніше обраного етапу",suggestNeedNine:"Потрібно мінімум 9 гравців у сітці",suggestPartial:(n)=>`Не вдалося знайти повну дев'ятку без перетинів — підібрано лише ${n} з 9. Спробуй раніший етап.`,suggestMathLimit:(n,max)=>`На цьому етапі сітка фізично дозволяє не більше ${max} гравців без перетинів (це властивість сітки, а не пошуку) — підібрано ${n} з 9. Спробуй раніший етап.`,r1Predictions:"Прогнози 1-го кола",suggestFilled:(max,roundName)=>`Готово: усі 9 підібрано. Без перетинів раніше обраного етапу вміщається максимум ${max} — решту дібрано з найпізнішим можливим вимушеним перетином (найближчий — ${roundName}).`,myLineups:"Склади",clearSelection:"Очистити склад",noTournaments:"Немає збережених турнірів",noLineups:"Немає збережених складів",suggestVariant:"Готово: новий варіант із мінімальними змінами",tour:"Тур",statsStatus:"Статистика",statsNotLoaded:"Не завантажена",statsLoading:"Завантаження статистики...",statsFailed:"Не вдалося завантажити — використано базовий пріоритет",statsKeyCollision:"Можливий збіг ключів гравців — статистика могла об'єднатися",showMore:(n)=>`Показати ще ${n}`,showLess:"Згорнути",reachChanceTitle:"Шанс, що ця зустріч взагалі відбудеться (обидва мають дійти до цього етапу)",favShort:"фав.",dogShort:"аутсайдер"},
@@ -377,6 +384,46 @@ function copyQuote(id){
   const btn = el.querySelector('.copybtn');
   const orig = btn.textContent; btn.textContent = T().copied;
   setTimeout(()=>{ btn.textContent = orig; }, 1500);
+}
+function toggleFantasyManual(){
+  const body = document.getElementById('fantasyManualBody');
+  const arrow = document.getElementById('fantasyManualArrow');
+  const open = body.style.display !== 'block';
+  body.style.display = open ? 'block' : 'none';
+  arrow.textContent = open ? '▴' : '▾';
+}
+// Fallback for when the auto-scraper's structural guesses about
+// tennisfantasy.cc's markup don't hold (verified: they can fail — Андрей
+// hit this on the WTA US Open page). Only name+price matter here; position/
+// seed/etc from whatever JSON he reconstructs are ignored since matching is
+// by name against the already-imported draw, not by position.
+function importFantasyPricesManual(){
+  const statusEl = document.getElementById('fantasyStatus');
+  if(!statusEl) return;
+  statusEl.style.display = 'block';
+  let raw;
+  try{
+    raw = JSON.parse(document.getElementById('fantasyManualJson').value);
+    if(!Array.isArray(raw)) throw new Error('not an array');
+  }catch(e){
+    statusEl.textContent = T().fantasyManualParseError;
+    return;
+  }
+  const priceByKey = {};
+  let parsedCount = 0;
+  raw.forEach(item=>{
+    if(!item || !item.name || item.price==null || isNaN(+item.price)) return;
+    const k = statsKey(item.name);
+    if(k){ priceByKey[k] = +item.price; parsedCount++; }
+  });
+  let matched = 0;
+  players.forEach(p=>{
+    const hit = priceByKey[statsKey(p.name)];
+    if(hit!=null){ p.fantasyPrice = hit; matched++; }
+    else { p.fantasyPrice = null; }
+  });
+  statusEl.textContent = `${T().fantasyLoaded}: ${matched}/${players.length} (${T().fantasyManualSource}, ${parsedCount})`;
+  renderList(); renderGrid(); renderResults();
 }
 function toggleInstr(){
   document.getElementById('instrBody').classList.toggle('open');
