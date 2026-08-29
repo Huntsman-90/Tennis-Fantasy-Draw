@@ -171,6 +171,13 @@
       <div id="statsStatus" class="stats-status" data-i18n="statsNotLoaded">Не загружена</div>
     </div>
   </div>
+  <div class="row" style="margin-top:8px">
+    <div style="flex:1"><label data-i18n="fantasyPriceLabel">Ссылка на турнир tennisfantasy.cc</label>
+      <input id="fantasyUrl" placeholder="https://tennisfantasy.cc/tournaments/...">
+    </div>
+  </div>
+  <button style="margin-top:8px" onclick="loadFantasyPrices()" data-i18n="fantasyLoadBtn">💰 Загрузить цены</button>
+  <div id="fantasyStatus" class="stats-status" style="margin-top:6px;display:none"></div>
   <label style="margin-top:10px" data-i18n="drawSize">Размер сетки</label>
   <select id="tSize">
     <option value="16">16</option><option value="28">28</option><option value="32" selected>32</option><option value="64">64</option><option value="128">128</option>
@@ -191,6 +198,13 @@
   <div class="suggest-row">
     <select id="clashThreshold"></select>
     <button id="suggestBtnEl" onclick="suggestLineup()" data-i18n="suggestBtn">🎯 Подсказать состав</button>
+  </div>
+  <div class="row" style="margin-top:6px;align-items:center;gap:6px">
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;flex:0">
+      <input type="checkbox" id="budgetEnabled" style="width:auto"> <span data-i18n="budgetEnable">Учитывать бюджет</span>
+    </label>
+    <input id="budgetCap" type="number" value="100" min="1" step="0.1" style="width:70px" placeholder="100">
+    <span style="font-size:11px;color:var(--muted)">M</span>
   </div>
   <div class="jumprow">
     <input id="jumpBox" type="number" data-i18n-ph="jumpPlaceholder" placeholder="Перейти к позиции №">
@@ -280,7 +294,9 @@ const BASE = {
   myLineups:"Составы", clearSelection:"Очистить состав", noTournaments:"Нет сохранённых турниров", noLineups:"Нет сохранённых составов",
   suggestVariant:"Готово: новый вариант с минимальными изменениями",
   tour:"Тур", statsStatus:"Статистика", statsNotLoaded:"Не загружена", statsLoading:"Загрузка статистики...",
-  statsFailed:"Не удалось загрузить — используется базовый приоритет",statsKeyCollision:"Возможное совпадение ключей игроков — статистика могла объединиться",showMore:(n)=>`Показать ещё ${n}`,showLess:"Свернуть",reachChanceTitle:"Шанс, что эта встреча вообще состоится (оба должны дойти до этого этапа)", favShort:"фав.", dogShort:"андердог"
+  statsFailed:"Не удалось загрузить — используется базовый приоритет",statsKeyCollision:"Возможное совпадение ключей игроков — статистика могла объединиться",showMore:(n)=>`Показать ещё ${n}`,showLess:"Свернуть",reachChanceTitle:"Шанс, что эта встреча вообще состоится (оба должны дойти до этого этапа)", favShort:"фав.", dogShort:"андердог",
+  fantasyPriceLabel:"Ссылка на турнир tennisfantasy.cc",fantasyLoadBtn:"💰 Загрузить цены",enterFantasyUrl:"Сначала вставь ссылку на турнир",fantasyLoading:"Загрузка цен...",fantasyFailed:"Не удалось загрузить цены — см. консоль/ответ сервера",fantasyLoaded:"Цены загружены",
+  budgetEnable:"Учитывать бюджет",budgetNoPrices:"Сначала загрузи цены fantasy",budgetPartial:(n,cost,excluded)=>`Подобрано ${n} из 9 в рамках бюджета (${cost}M потрачено). ${excluded?excluded+' игрок(ов) без цены исключены из подбора.':''}`,budgetSuccess:(cost,cap,roundLabel)=>`Готово: 9 игроков, ${cost}M из ${cap}M бюджета.${roundLabel?' Ближайший вынужденный перетин: '+roundLabel+'.':' Без перетинов раньше выбранного этапа.'}`
 };
 const TR = {
   uk:{title:"Draw Clash Checker",subtitle:"Перевірка своєї дев'ятки: де по сітці вона перетинається сама з собою.",tournament:"Турнір",name:"Назва",surface:"Покриття",drawSize:"Розмір сітки",howTo:"Як отримати JSON?",jsonLabel:"JSON сітки",importBtn:"Імпортувати сітку",selection:"Вибір дев'ятки",selected:"Обрано",fullDraw:"Повна сітка",early:"Рання зустріч",mid:"Середній раунд",late:"Пізня зустріч",lineupResults:"Дев'ятка і перетини",disclaimer:"Лише структурний факт можливої зустрічі.",noData:"немає даних",copied:"Скопійовано",credit:"Створено Huntsman",myTournaments:"Мої турніри",libraryEmpty:"Поки немає збережених турнірів",saveToLibrary:"Зберегти в бібліотеку",enterName:"Спочатку введи назву турніру",swapHint:"Натисни ⇄ біля гравця, потім обери заміну у списку вище.",compareTitle:"Порівняння складів",saveAsA:"Запам'ятати як A",saveAsB:"Запам'ятати як B",onlyIn:"Лише в",both:"В обох",needNine:"Спочатку обери 9 гравців",confirmDelete:"Видалити цей турнір?",saveLibA:"💾 A в бібліотеку",saveLibB:"💾 B в бібліотеку",nameForVariant:"Назва для цього варіанту",savedToLibrary:"Збережено в бібліотеку",jumpPlaceholder:"Перейти до позиції №",jumpBtn:"Перейти",viewFlat:"Список",viewBracket:"По сітці",upperHalf:"Верхня половина сітки",lowerHalf:"Нижня половина сітки",notFound:"Позицію не знайдено",suggestBtn:"🎯 Підказати склад",noEarlierThan:"Не раніше",noClashAtAll:"Зовсім без перетинів",suggestSuccess:"Готово: дев'ятка без перетинів раніше обраного етапу",suggestNeedNine:"Потрібно мінімум 9 гравців у сітці",suggestPartial:(n)=>`Не вдалося знайти повну дев'ятку без перетинів — підібрано лише ${n} з 9. Спробуй раніший етап.`,suggestMathLimit:(n,max)=>`На цьому етапі сітка фізично дозволяє не більше ${max} гравців без перетинів (це властивість сітки, а не пошуку) — підібрано ${n} з 9. Спробуй раніший етап.`,r1Predictions:"Прогнози 1-го кола",suggestFilled:(max,roundName)=>`Готово: усі 9 підібрано. Без перетинів раніше обраного етапу вміщається максимум ${max} — решту дібрано з найпізнішим можливим вимушеним перетином (найближчий — ${roundName}).`,myLineups:"Склади",clearSelection:"Очистити склад",noTournaments:"Немає збережених турнірів",noLineups:"Немає збережених складів",suggestVariant:"Готово: новий варіант із мінімальними змінами",tour:"Тур",statsStatus:"Статистика",statsNotLoaded:"Не завантажена",statsLoading:"Завантаження статистики...",statsFailed:"Не вдалося завантажити — використано базовий пріоритет",statsKeyCollision:"Можливий збіг ключів гравців — статистика могла об'єднатися",showMore:(n)=>`Показати ще ${n}`,showLess:"Згорнути",reachChanceTitle:"Шанс, що ця зустріч взагалі відбудеться (обидва мають дійти до цього етапу)",favShort:"фав.",dogShort:"аутсайдер"},
@@ -715,6 +731,38 @@ async function fetchYearMatches(tour, year, isCurrentYear){
     return {matches: [], ok:false};
   }
 }
+// Fantasy prices come from tennisfantasy.cc's own "Firstname Surname" Latin
+// format — same shape as the draw JSON now that Андрей sources names from
+// English sites — so the existing statsKey() surname+initial matcher (built
+// for stats-archive matching) works here directly with no separate matcher.
+async function loadFantasyPrices(){
+  const url = (document.getElementById('fantasyUrl')?.value || '').trim();
+  const statusEl = document.getElementById('fantasyStatus');
+  if(!statusEl) return;
+  if(!url){ alert(T().enterFantasyUrl); return; }
+  statusEl.style.display = 'block';
+  statusEl.textContent = T().fantasyLoading;
+  try{
+    const resp = await fetch(`/api/fantasy-prices?url=${encodeURIComponent(url)}`);
+    const data = await resp.json();
+    if(!resp.ok || !data.count){
+      statusEl.textContent = data.warning || data.error || T().fantasyFailed;
+      return;
+    }
+    const priceByKey = {};
+    data.players.forEach(fp=>{ const k = statsKey(fp.name); if(k) priceByKey[k] = fp; });
+    let matched = 0;
+    players.forEach(p=>{
+      const hit = priceByKey[statsKey(p.name)];
+      if(hit){ p.fantasyPrice = hit.price; matched++; }
+      else { p.fantasyPrice = null; }
+    });
+    statusEl.textContent = `${T().fantasyLoaded}: ${matched}/${players.length} (${data.strategy})`;
+    renderList(); renderGrid(); renderResults();
+  }catch(e){
+    statusEl.textContent = T().fantasyFailed;
+  }
+}
 async function ensureStatsLoaded(){
   resolveStatsKeyCache.clear(); // stats archive (and therefore every name resolution) is about to change
   const tour = document.getElementById('tTour')?.value || 'atp';
@@ -793,6 +841,27 @@ async function suggestLineup(){
   if(btn) btn.disabled = false;
   const thresholdIdx = +document.getElementById('clashThreshold').value;
 
+  const budgetOn = document.getElementById('budgetEnabled')?.checked;
+  if(budgetOn){
+    const budgetCap = +(document.getElementById('budgetCap')?.value || 100);
+    if(!players.some(p=>p.fantasyPrice!=null)){ alert(T().budgetNoPrices); return; }
+    const result = budgetConstrainedLineup(thresholdIdx, budgetCap);
+    const filled = fillToNineBudget(result.chosen, result.remainingBudgetUnits);
+    replacingPos = null;
+    selected = filled.chosen.map(p=>p.pos);
+    lastSuggested = selected.slice();
+    renderList(); renderGrid(); renderResults();
+    const totalCost = filled.chosen.reduce((s,p)=>s+(p.fantasyPrice||0),0);
+    if(filled.chosen.length<9){
+      alert(T().budgetPartial(filled.chosen.length, totalCost.toFixed(1), result.excludedNoPrice));
+    } else {
+      const names2 = roundNames();
+      const roundLabel = filled.nearestForcedRound!==null ? names2[filled.nearestForcedRound] : '';
+      alert(T().budgetSuccess(totalCost.toFixed(1), budgetCap, roundLabel));
+    }
+    return;
+  }
+
   const variant = tryNearbyVariant(thresholdIdx);
   if(variant){
     replacingPos = null;
@@ -843,6 +912,95 @@ function fillToNine(chosen){
     } else break;
   }
   return {chosen:set, nearestForcedRound};
+}
+// Budget-constrained variant of exactMaxLineup: same "one best player per
+// non-overlapping bracket group" structure, but now the choice within (and
+// across) groups also has to respect a total fantasy-price cap. Picking the
+// single best-priority player per group independently (like exactMaxLineup
+// does) can blow the budget even when a cheaper, slightly-lower-priority
+// player in the same group would have fit — so this needs a real group
+// knapsack: choose at most 9 groups, one candidate from each, minimizing
+// total priority (lower = better, same convention as playerPriority)
+// subject to total price <= budget.
+// Players with no known fantasy price are excluded from candidacy here —
+// we can't verify budget validity for them, and silently ignoring the cap
+// would defeat the point of turning it on.
+function fillToNineBudget(chosen, remainingBudgetUnits){
+  const set = [...chosen];
+  let nearestForcedRound = null;
+  let budget = remainingBudgetUnits;
+  while(set.length<9){
+    const remaining = players.filter(p=>!set.includes(p) && p.fantasyPrice!=null && Math.round(p.fantasyPrice*10)<=budget);
+    if(!remaining.length) break;
+    let bestCandidate=null, bestWorstRound=-Infinity, bestPriority=Infinity;
+    for(const p of remaining){
+      let worstRound = Infinity;
+      set.forEach(s=>{ const r = meetRound(p.pos, s.pos); if(r!==null && r<worstRound) worstRound = r; });
+      const priority = playerPriority(p);
+      if(worstRound>bestWorstRound || (worstRound===bestWorstRound && priority<bestPriority)){
+        bestWorstRound = worstRound; bestCandidate = p; bestPriority = priority;
+      }
+    }
+    if(bestCandidate){
+      set.push(bestCandidate);
+      budget -= Math.round(bestCandidate.fantasyPrice*10);
+      if(bestWorstRound!==Infinity && (nearestForcedRound===null || bestWorstRound<nearestForcedRound)) nearestForcedRound = bestWorstRound;
+    } else break;
+  }
+  return {chosen:set, nearestForcedRound};
+}
+function budgetConstrainedLineup(thresholdIdx, budgetM){
+  const groupSize = Math.pow(2, thresholdIdx);
+  const groupsMap = {};
+  let excludedNoPrice = 0;
+  players.forEach(p=>{
+    if(p.fantasyPrice==null){ excludedNoPrice++; return; }
+    const gid = Math.ceil(p.pos/groupSize);
+    (groupsMap[gid] = groupsMap[gid]||[]).push(p);
+  });
+  const groups = Object.values(groupsMap).map(g =>
+    g.map(p => ({player:p, priority:playerPriority(p), priceUnits:Math.round(p.fantasyPrice*10)}))
+  );
+  const BUDGET_UNITS = Math.round(budgetM*10);
+  const MAXCOUNT = 9;
+  let dp = Array.from({length:MAXCOUNT+1}, ()=>new Array(BUDGET_UNITS+1).fill(Infinity));
+  dp[0][0] = 0;
+  const history = [];
+  groups.forEach(cands=>{
+    const ndp = dp.map(row=>row.slice());
+    const choice = Array.from({length:MAXCOUNT+1}, ()=>new Array(BUDGET_UNITS+1).fill(-1));
+    for(let k=0;k<MAXCOUNT;k++){
+      for(let b=0;b<=BUDGET_UNITS;b++){
+        if(dp[k][b]===Infinity) continue;
+        cands.forEach((c,ci)=>{
+          const nb = b + c.priceUnits;
+          if(nb>BUDGET_UNITS) return;
+          const nv = dp[k][b] + c.priority;
+          if(nv < ndp[k+1][nb]){ ndp[k+1][nb] = nv; choice[k+1][nb] = ci; }
+        });
+      }
+    }
+    history.push(choice);
+    dp = ndp;
+  });
+  let bestK=0, bestB=0;
+  for(let k=Math.min(MAXCOUNT, groups.length); k>=0; k--){
+    let localBest=Infinity, localB=-1;
+    for(let b=0;b<=BUDGET_UNITS;b++){ if(dp[k][b]<localBest){ localBest=dp[k][b]; localB=b; } }
+    if(localB>=0){ bestK=k; bestB=localB; break; }
+  }
+  const chosen = [];
+  let k=bestK, b=bestB;
+  for(let g=groups.length-1; g>=0; g--){
+    const ci = history[g][k][b];
+    if(ci===-1) continue;
+    const cand = groups[g][ci];
+    chosen.push(cand.player);
+    b -= cand.priceUnits; k -= 1;
+  }
+  chosen.reverse();
+  const totalCost = chosen.reduce((s,p)=>s+p.fantasyPrice,0);
+  return { chosen, maxAvailable: bestK, groupsCount: groups.length, excludedNoPrice, totalCost, remainingBudgetUnits: BUDGET_UNITS - Math.round(totalCost*10) };
 }
 function exactMaxLineup(thresholdIdx){
   // The draw splits into disjoint equal-size groups at this threshold: everyone inside
@@ -1052,7 +1210,7 @@ function buildRowHtml(p, baseSummary){
   const dbgBtn = statsIndex ? `<button class="dbgbtn" onclick="event.stopPropagation();togglePlayerDebug(${p.pos})">ⓘ</button>` : '';
   return `<div class="prow ${rowClass}" data-pos="${p.pos}" onclick="toggleSelect(${p.pos})">
     <span class="pos">#${p.pos}</span><span class="nm">${p.name}</span>
-    <span class="sd">${p.seed?'#'+p.seed:''}</span>
+    <span class="sd">${p.seed?'#'+p.seed:''}${p.fantasyPrice!=null?' · '+p.fantasyPrice+'M':''}</span>
     ${deltaHtml}
     ${swapBtn}${dbgBtn}
     <span class="badge ${isSel?'':'empty'}">${slotNum}</span></div>${statsIndex?`<div class="prow-debug" id="dbg-${p.pos}" style="display:none">${escapeHtml(playerFactorsDebugText(p))}</div>`:''}`;
