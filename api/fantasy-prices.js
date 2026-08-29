@@ -117,19 +117,46 @@ function normalizeNextDataPlayer(obj) {
   return { name: String(name).trim(), price: +price, seed: seed ? +seed || null : null, country: country ? String(country).trim() : null };
 }
 function parseFromLinks(html) {
+  // href pattern confirmed against the real page:
+  // /players/aryna-sabalenka-wta?tournament=u-s-open-2026-wta
   const players = [];
   const linkRe = /<a[^>]+href="\/players\/[a-z0-9-]+\?tournament=[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
   let m;
   while ((m = linkRe.exec(html)) !== null) {
-    const text = m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    const parsed = parseEntryText(text);
+    const parsed = parseEntryBlock(m[1]);
     if (parsed) players.push(parsed);
   }
   return players;
 }
-function parseEntryText(text) {
-  // "[3] Aliassime Felix Auger Aliassime CAN 14.0M" or "Munar Jaume Munar ESP 7.4M"
-  const m = text.match(/^(?:\[(\d+)\]\s+)?\S+\s+(.+?)\s+([A-Z]{2,3})\s+(\d+(?:\.\d+)?)M$/);
-  if (!m) return null;
-  return { name: m[2].trim(), price: parseFloat(m[4]), seed: m[1] ? +m[1] : null, country: m[3] };
+function cleanText(s) {
+  // React SSR inserts <!-- --> hydration markers between text fragments
+  // (e.g. "Aryna<!-- --> <!-- -->Sabalenka", "15.0<!-- -->M") -- strip
+  // those and any other nested tags before reading the text.
+  return s.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+}
+function parseEntryBlock(block) {
+  // Confirmed structure from a real fetch (2026-08-29):
+  //   <span class="text-text-muted w-8 text-center text-sm">[1]</span>   -- seed, optional
+  //   <div>...<img alt="Sabalenka" .../></div>                          -- NOT the name; earlier
+  //     markdown-only testing mistook this alt text for a separate
+  //     "display key" token, which is what broke the original regex
+  //   <span class="text-white font-medium ...">Aryna<!-- --> <!-- -->Sabalenka</span>
+  //   <span class="text-text-muted text-xs mr-4">BLR</span>             -- country
+  //   <span class="text-accent font-bold text-sm">15.0<!-- -->M</span>  -- price
+  const seedMatch = block.match(/\[(\d+)\]/);
+  const nameMatch = block.match(/class="text-white font-medium[^"]*">([\s\S]*?)<\/span>/);
+  if (!nameMatch) return null;
+  const name = cleanText(nameMatch[1]);
+  if (!name) return null;
+  // Country: whatever <span> comes right after the name span closes --
+  // matched positionally rather than by exact class string, since that's
+  // more tolerant of minor class-name changes than the name/price spans.
+  const afterName = block.slice(nameMatch.index + nameMatch[0].length);
+  const countryMatch = afterName.match(/<span[^>]*>([\s\S]*?)<\/span>/);
+  const country = countryMatch ? cleanText(countryMatch[1]) || null : null;
+  const priceMatch = block.match(/class="text-accent font-bold[^"]*">([\s\S]*?)<\/span>/);
+  if (!priceMatch) return null;
+  const priceNum = parseFloat(cleanText(priceMatch[1]).replace(/[^0-9.]/g, ''));
+  if (isNaN(priceNum)) return null;
+  return { name, price: priceNum, seed: seedMatch ? +seedMatch[1] : null, country };
 }
