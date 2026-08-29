@@ -1010,18 +1010,41 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
   );
   const BUDGET_UNITS = Math.round(budgetM*10);
   const MAXCOUNT = 9;
-  let dp = Array.from({length:MAXCOUNT+1}, ()=>new Array(BUDGET_UNITS+1).fill(Infinity));
+  // A squad ALWAYS needs exactly 9 for a valid fantasy entry — that's a hard
+  // rule, not a nice-to-have. Left unchecked, this phase happily spends
+  // almost the whole budget chasing the best possible players for however
+  // many bracket groups exist (often <9, e.g. exactly 8 at the QF
+  // threshold), leaving nothing for the mandatory remaining slot(s) —
+  // exactly what happened to Андрей (99.4M of 100M spent on 8, 0.6M left,
+  // nobody affordable for #9). Fix: reserve the minimum plausible cost of
+  // however many extra slots fillToNineBudget will need to fill, BEFORE
+  // this phase is allowed to spend anything — cap this phase's own budget
+  // at (total - reserve) so it physically can't eat into that reserve.
+  // This is a heuristic lower bound, not a perfect joint optimum (the
+  // reserved amount assumes the N globally cheapest priced players, not
+  // necessarily the specific ones fillToNineBudget will actually pick,
+  // since that also weighs clash timing) — but it guarantees affordability
+  // whenever it's theoretically possible at all, which is what matters.
+  const groupsAvailable = Math.min(MAXCOUNT, groups.length);
+  const overflowSlotsNeeded = Math.max(0, MAXCOUNT - groupsAvailable);
+  let reserveUnits = 0;
+  if(overflowSlotsNeeded>0){
+    const allPriceUnits = players.filter(p=>p.fantasyPrice!=null).map(p=>Math.round(p.fantasyPrice*10)).sort((a,b)=>a-b);
+    reserveUnits = allPriceUnits.slice(0, overflowSlotsNeeded).reduce((s,x)=>s+x,0);
+  }
+  const GROUP_PHASE_BUDGET = Math.max(0, BUDGET_UNITS - reserveUnits);
+  let dp = Array.from({length:MAXCOUNT+1}, ()=>new Array(GROUP_PHASE_BUDGET+1).fill(Infinity));
   dp[0][0] = 0;
   const history = [];
   groups.forEach(cands=>{
     const ndp = dp.map(row=>row.slice());
-    const choice = Array.from({length:MAXCOUNT+1}, ()=>new Array(BUDGET_UNITS+1).fill(-1));
+    const choice = Array.from({length:MAXCOUNT+1}, ()=>new Array(GROUP_PHASE_BUDGET+1).fill(-1));
     for(let k=0;k<MAXCOUNT;k++){
-      for(let b=0;b<=BUDGET_UNITS;b++){
+      for(let b=0;b<=GROUP_PHASE_BUDGET;b++){
         if(dp[k][b]===Infinity) continue;
         cands.forEach((c,ci)=>{
           const nb = b + c.priceUnits;
-          if(nb>BUDGET_UNITS) return;
+          if(nb>GROUP_PHASE_BUDGET) return;
           const nv = dp[k][b] + c.priority;
           if(nv < ndp[k+1][nb]){ ndp[k+1][nb] = nv; choice[k+1][nb] = ci; }
         });
@@ -1033,7 +1056,7 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
   let bestK=0, bestB=0;
   for(let k=Math.min(MAXCOUNT, groups.length); k>=0; k--){
     let localBest=Infinity, localB=-1;
-    for(let b=0;b<=BUDGET_UNITS;b++){ if(dp[k][b]<localBest){ localBest=dp[k][b]; localB=b; } }
+    for(let b=0;b<=GROUP_PHASE_BUDGET;b++){ if(dp[k][b]<localBest){ localBest=dp[k][b]; localB=b; } }
     if(localB>=0){ bestK=k; bestB=localB; break; }
   }
   const chosen = [];
