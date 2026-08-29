@@ -508,29 +508,44 @@ function recencyWeight(dateStr){
 }
 // A win only tells you as much as who it was against: beating a top player
 // is a stronger signal than beating a journeyman, and losing to a weak
-// player is a worse sign than losing to a top-10 player. Rather than three
-// arbitrary hand-picked multipliers, this reuses the SAME rank->strength
-// curve already used for rankScore below (rank 1 = 1.0, rank 151+ = 0), so
-// the adjustment is expressed on the same scale as the rest of the model
-// instead of being a disconnected new unit.
-// UPSET_BONUS/PUNISH_BONUS are intentionally modest (max +/-50%) — this is
-// a refinement to the win/loss signal, not a replacement for it. Andrey
-// asked for this but wasn't sure of the right coefficient; these are a
-// defensible starting point, not a value reverse-engineered from a
-// third-party tool's opaque output — easy to retune here if it proves too
-// strong or too weak in practice.
-const UPSET_BONUS = 0.5;  // beating the #1 player counts up to 1.5x a routine win
-const PUNISH_BONUS = 0.5; // losing to the lowest-ranked opponent counts up to 1.5x a routine loss
-function opponentAdjustment(m){
-  if(!m.oppRank) return 1; // no opponent rank on record — no adjustment, not a penalty
-  const oppStrength = Math.max(0, 1-(m.oppRank-1)/150);
-  return m.win ? 1 + UPSET_BONUS*oppStrength : 1 + PUNISH_BONUS*(1-oppStrength);
-}
+// player is a worse sign than losing to a top-10 player. Reuses the SAME
+// rank->strength curve already used for rankScore below (rank 1 = 1.0,
+// rank 151+ = 0), so the adjustment is expressed on the same scale as the
+// rest of the model instead of being a disconnected new unit.
+//
+// This used to be a plain weight multiplier on top of the win/loss ratio,
+// but that saturates: a 100%-loss or 100%-win streak divides to exactly
+// 0 or 1 no matter how the weights are distributed (0/anything=0,
+// anything/itself=1), so opponent quality had literally nothing left to
+// differentiate right at the boundary — Андрей caught this. Fix: leave a
+// small headroom at both ends (QUALITY_HEADROOM) so a routine clean streak
+// lands close to but not exactly at 0/1, and opponent-quality becomes a
+// signed nudge within that headroom — differentiable everywhere, not just
+// in mixed win/loss histories. When there's no opponent-rank data at all,
+// this returns the plain unmodified rate (old behavior) rather than
+// forcing the headroom compression on data that has nothing to nudge with.
+const QUALITY_HEADROOM = 0.12; // a routine 100% streak reads as ~0.88, not exactly 1.0 — leaves room above for a genuine all-upset streak to still mean something
 function weightedWinRate(matches){
   if(!matches.length) return null;
   let wSum=0, wWinSum=0;
-  matches.forEach(m=>{ const w = recencyWeight(m.date)*opponentAdjustment(m); wSum+=w; if(m.win) wWinSum+=w; });
-  return wSum>0 ? wWinSum/wSum : null;
+  matches.forEach(m=>{ const w = recencyWeight(m.date); wSum+=w; if(m.win) wWinSum+=w; });
+  if(wSum<=0) return null;
+  const baseRate = wWinSum/wSum;
+  let qSum=0, qSigned=0;
+  matches.forEach(m=>{
+    if(!m.oppRank) return;
+    const w = recencyWeight(m.date);
+    const oppStrength = Math.max(0, 1-(m.oppRank-1)/150); // same curve as rankScore
+    // win vs strong opponent -> positive signal; loss vs weak opponent ->
+    // negative signal; the "routine" cases (beat a weak opp, lost to a
+    // strong one) land near neutral rather than at a hard extreme.
+    const signal = m.win ? (oppStrength*2-1) : -((1-oppStrength)*2-1);
+    qSum += w; qSigned += w*signal;
+  });
+  if(qSum<=0) return baseRate; // no opponent-rank data on any match — nothing to nudge with, old behavior
+  const nudge = (qSigned/qSum) * QUALITY_HEADROOM;
+  const compressed = baseRate*(1-2*QUALITY_HEADROOM) + QUALITY_HEADROOM;
+  return Math.max(0, Math.min(1, compressed + nudge));
 }
 function playerFactors(key, surface){
   if(!statsIndex) return null;
