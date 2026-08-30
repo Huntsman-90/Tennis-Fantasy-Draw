@@ -979,13 +979,22 @@ function fillToNineBudget(chosen, remainingBudgetUnits){
   while(set.length<9){
     const remaining = players.filter(p=>!set.includes(p) && p.fantasyPrice!=null && Math.round(p.fantasyPrice*10)<=budget);
     if(!remaining.length) break;
-    let bestCandidate=null, bestWorstRound=-Infinity, bestPriority=Infinity;
+    // Unlike the non-budget fillToNine (which prioritizes the latest
+    // possible forced clash above everything else — the right call when
+    // clash-avoidance IS the whole point), this picks by QUALITY first.
+    // A forced compromise slot should go to a genuinely competitive player
+    // over a guaranteed-early-exit one, even if the weak player's clash
+    // with the rest of the squad happens to land a round later by pure
+    // accident of bracket position — that "win" is meaningless if they
+    // were never going to score fantasy points anyway. Clash round is now
+    // only a tiebreak between similarly-priced/similarly-strong picks.
+    let bestCandidate=null, bestPriority=Infinity, bestWorstRound=-Infinity;
     for(const p of remaining){
+      const priority = playerPriority(p);
       let worstRound = Infinity;
       set.forEach(s=>{ const r = meetRound(p.pos, s.pos); if(r!==null && r<worstRound) worstRound = r; });
-      const priority = playerPriority(p);
-      if(worstRound>bestWorstRound || (worstRound===bestWorstRound && priority<bestPriority)){
-        bestWorstRound = worstRound; bestCandidate = p; bestPriority = priority;
+      if(priority<bestPriority || (priority===bestPriority && worstRound>bestWorstRound)){
+        bestPriority = priority; bestCandidate = p; bestWorstRound = worstRound;
       }
     }
     if(bestCandidate){
@@ -1016,21 +1025,33 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
   // many bracket groups exist (often <9, e.g. exactly 8 at the QF
   // threshold), leaving nothing for the mandatory remaining slot(s) —
   // exactly what happened to Андрей (99.4M of 100M spent on 8, 0.6M left,
-  // nobody affordable for #9). Fix: reserve the minimum plausible cost of
-  // however many extra slots fillToNineBudget will need to fill, BEFORE
-  // this phase is allowed to spend anything — cap this phase's own budget
-  // at (total - reserve) so it physically can't eat into that reserve.
-  // This is a heuristic lower bound, not a perfect joint optimum (the
-  // reserved amount assumes the N globally cheapest priced players, not
-  // necessarily the specific ones fillToNineBudget will actually pick,
-  // since that also weighs clash timing) — but it guarantees affordability
-  // whenever it's theoretically possible at all, which is what matters.
+  // nobody affordable for #9). Fix: reserve budget for the overflow
+  // slot(s) BEFORE this phase is allowed to spend anything, capping its
+  // own usable budget at (total - reserve).
+  //
+  // The reserve estimate matters: reserving against the N globally
+  // cheapest priced players (an earlier version of this fix) can badly
+  // misjudge things — Андрей pointed out that "cheapest" is often a
+  // hopeless 1-2M no-hoper, while a genuinely competitive fill-in player
+  // realistically costs 6.8-9M+. Reserving for the no-hoper either wastes
+  // structural-pick quality on an unnecessarily large cushion, or — worse —
+  // under-reserves relative to what fillToNineBudget will actually spend,
+  // since it doesn't just grab the cheapest option: it picks by clash
+  // timing first, price second. Fixed by using a REAL dry run instead of a
+  // blind price-only guess: compute the best structural picks ignoring
+  // price entirely (same idea as exactMaxLineup), run fillToNineBudget's
+  // actual clash-aware logic against them with no price ceiling, and
+  // reserve whatever it naturally spends on the overflow slots. This
+  // reflects what a sensible fill-in pick really costs, not the cheapest
+  // theoretically possible one.
   const groupsAvailable = Math.min(MAXCOUNT, groups.length);
   const overflowSlotsNeeded = Math.max(0, MAXCOUNT - groupsAvailable);
   let reserveUnits = 0;
   if(overflowSlotsNeeded>0){
-    const allPriceUnits = players.filter(p=>p.fantasyPrice!=null).map(p=>Math.round(p.fantasyPrice*10)).sort((a,b)=>a-b);
-    reserveUnits = allPriceUnits.slice(0, overflowSlotsNeeded).reduce((s,x)=>s+x,0);
+    const idealPerGroup = groups.map(cands => cands.reduce((best,c)=> c.priority<best.priority ? c : best).player);
+    const idealFilled = fillToNineBudget(idealPerGroup, Infinity);
+    const addedSlots = idealFilled.chosen.slice(idealPerGroup.length);
+    reserveUnits = addedSlots.reduce((s,p)=> s + Math.round((p.fantasyPrice||0)*10), 0);
   }
   const GROUP_PHASE_BUDGET = Math.max(0, BUDGET_UNITS - reserveUnits);
   let dp = Array.from({length:MAXCOUNT+1}, ()=>new Array(GROUP_PHASE_BUDGET+1).fill(Infinity));
