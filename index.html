@@ -184,6 +184,12 @@
     <textarea id="fantasyManualJson" placeholder='[{"name":"Aryna Sabalenka","price":15.0}, ...]'></textarea>
     <button class="btn-main" onclick="importFantasyPricesManual()" data-i18n="fantasyManualImportBtn">Импортировать цены вручную</button>
   </div>
+  <button class="btn-ghost" style="margin-top:8px" onclick="toggleUtrManual()"><span data-i18n="utrManualToggle">UTR-рейтинг (только вручную — у UTR нет открытых данных)</span><span id="utrManualArrow">▾</span></button>
+  <div id="utrManualBody" style="display:none">
+    <label style="margin-top:6px" data-i18n="utrManualLabel">UTR (JSON: name + utr, остальные поля не нужны)</label>
+    <textarea id="utrManualJson" placeholder='[{"name":"Carlos Alcaraz","utr":16.45}, ...]'></textarea>
+    <button class="btn-main" onclick="importUtrManual()" data-i18n="utrManualImportBtn">Импортировать UTR</button>
+  </div>
   <label style="margin-top:10px" data-i18n="drawSize">Размер сетки</label>
   <select id="tSize">
     <option value="16">16</option><option value="28">28</option><option value="32" selected>32</option><option value="64">64</option><option value="128">128</option>
@@ -303,7 +309,8 @@ const BASE = {
   statsFailed:"Не удалось загрузить — используется базовый приоритет",statsKeyCollision:"Возможное совпадение ключей игроков — статистика могла объединиться",showMore:(n)=>`Показать ещё ${n}`,showLess:"Свернуть",reachChanceTitle:"Шанс, что эта встреча вообще состоится (оба должны дойти до этого этапа)", favShort:"фав.", dogShort:"андердог",
   fantasyPriceLabel:"Ссылка на турнир tennisfantasy.cc",fantasyLoadBtn:"💰 Загрузить цены",enterFantasyUrl:"Сначала вставь ссылку на турнир",fantasyLoading:"Загрузка цен...",fantasyFailed:"Не удалось загрузить цены — см. консоль/ответ сервера",fantasyLoaded:"Цены загружены",
   budgetEnable:"Учитывать бюджет",budgetNoPrices:"Сначала загрузи цены fantasy",budgetPartial:(n,cost,excluded)=>`Подобрано ${n} из 9 в рамках бюджета (${cost}M потрачено). ${excluded?excluded+' игрок(ов) без цены исключены из подбора.':''}`,budgetSuccess:(cost,cap,roundLabel)=>`Готово: 9 игроков, ${cost}M из ${cap}M бюджета.${roundLabel?' Ближайший вынужденный перетин: '+roundLabel+'.':' Без перетинов раньше выбранного этапа.'}`,
-  fantasyManualToggle:"Если автозагрузка не сработала — вставить вручную",fantasyManualLabel:"Цены (JSON: name + price, остальные поля не нужны)",fantasyManualImportBtn:"Импортировать цены вручную",fantasyManualParseError:"Не удалось разобрать JSON — проверь формат",fantasyManualSource:"вручную"
+  fantasyManualToggle:"Если автозагрузка не сработала — вставить вручную",fantasyManualLabel:"Цены (JSON: name + price, остальные поля не нужны)",fantasyManualImportBtn:"Импортировать цены вручную",fantasyManualParseError:"Не удалось разобрать JSON — проверь формат",fantasyManualSource:"вручную",
+  utrManualToggle:"UTR-рейтинг (только вручную — у UTR нет открытых данных)",utrManualLabel:"UTR (JSON: name + utr, остальные поля не нужны)",utrManualImportBtn:"Импортировать UTR",utrLoaded:"UTR загружен"
 };
 const TR = {
   uk:{title:"Draw Clash Checker",subtitle:"Перевірка своєї дев'ятки: де по сітці вона перетинається сама з собою.",tournament:"Турнір",name:"Назва",surface:"Покриття",drawSize:"Розмір сітки",howTo:"Як отримати JSON?",jsonLabel:"JSON сітки",importBtn:"Імпортувати сітку",selection:"Вибір дев'ятки",selected:"Обрано",fullDraw:"Повна сітка",early:"Рання зустріч",mid:"Середній раунд",late:"Пізня зустріч",lineupResults:"Дев'ятка і перетини",disclaimer:"Лише структурний факт можливої зустрічі.",noData:"немає даних",copied:"Скопійовано",credit:"Створено Huntsman",myTournaments:"Мої турніри",libraryEmpty:"Поки немає збережених турнірів",saveToLibrary:"Зберегти в бібліотеку",enterName:"Спочатку введи назву турніру",swapHint:"Натисни ⇄ біля гравця, потім обери заміну у списку вище.",compareTitle:"Порівняння складів",saveAsA:"Запам'ятати як A",saveAsB:"Запам'ятати як B",onlyIn:"Лише в",both:"В обох",needNine:"Спочатку обери 9 гравців",confirmDelete:"Видалити цей турнір?",saveLibA:"💾 A в бібліотеку",saveLibB:"💾 B в бібліотеку",nameForVariant:"Назва для цього варіанту",savedToLibrary:"Збережено в бібліотеку",jumpPlaceholder:"Перейти до позиції №",jumpBtn:"Перейти",viewFlat:"Список",viewBracket:"По сітці",upperHalf:"Верхня половина сітки",lowerHalf:"Нижня половина сітки",notFound:"Позицію не знайдено",suggestBtn:"🎯 Підказати склад",noEarlierThan:"Не раніше",noClashAtAll:"Зовсім без перетинів",suggestSuccess:"Готово: дев'ятка без перетинів раніше обраного етапу",suggestNeedNine:"Потрібно мінімум 9 гравців у сітці",suggestPartial:(n)=>`Не вдалося знайти повну дев'ятку без перетинів — підібрано лише ${n} з 9. Спробуй раніший етап.`,suggestMathLimit:(n,max)=>`На цьому етапі сітка фізично дозволяє не більше ${max} гравців без перетинів (це властивість сітки, а не пошуку) — підібрано ${n} з 9. Спробуй раніший етап.`,r1Predictions:"Прогнози 1-го кола",suggestFilled:(max,roundName)=>`Готово: усі 9 підібрано. Без перетинів раніше обраного етапу вміщається максимум ${max} — решту дібрано з найпізнішим можливим вимушеним перетином (найближчий — ${roundName}).`,myLineups:"Склади",clearSelection:"Очистити склад",noTournaments:"Немає збережених турнірів",noLineups:"Немає збережених складів",suggestVariant:"Готово: новий варіант із мінімальними змінами",tour:"Тур",statsStatus:"Статистика",statsNotLoaded:"Не завантажена",statsLoading:"Завантаження статистики...",statsFailed:"Не вдалося завантажити — використано базовий пріоритет",statsKeyCollision:"Можливий збіг ключів гравців — статистика могла об'єднатися",showMore:(n)=>`Показати ще ${n}`,showLess:"Згорнути",reachChanceTitle:"Шанс, що ця зустріч взагалі відбудеться (обидва мають дійти до цього етапу)",favShort:"фав.",dogShort:"аутсайдер"},
@@ -423,6 +430,45 @@ function importFantasyPricesManual(){
     else { p.fantasyPrice = null; }
   });
   statusEl.textContent = `${T().fantasyLoaded}: ${matched}/${players.length} (${T().fantasyManualSource}, ${parsedCount})`;
+  renderList(); renderGrid(); renderResults();
+}
+function toggleUtrManual(){
+  const body = document.getElementById('utrManualBody');
+  const arrow = document.getElementById('utrManualArrow');
+  const open = body.style.display !== 'block';
+  body.style.display = open ? 'block' : 'none';
+  arrow.textContent = open ? '▴' : '▾';
+}
+// No auto-load path exists for UTR (confirmed: ratings only load client-side
+// after login on utrsports.net, unlike tennisfantasy.cc's open SSR HTML) --
+// manual JSON is the only route. Blends into rankScore (see UTR_BLEND_WEIGHT
+// near playerFactors), not a standalone MALAGA_WEIGHTS factor.
+function importUtrManual(){
+  const statusEl = document.getElementById('fantasyStatus');
+  if(!statusEl) return;
+  statusEl.style.display = 'block';
+  let raw;
+  try{
+    raw = JSON.parse(document.getElementById('utrManualJson').value);
+    if(!Array.isArray(raw)) throw new Error('not an array');
+  }catch(e){
+    statusEl.textContent = T().fantasyManualParseError;
+    return;
+  }
+  const utrByKey = {};
+  let parsedCount = 0;
+  raw.forEach(item=>{
+    if(!item || !item.name || item.utr==null || isNaN(+item.utr)) return;
+    const k = statsKey(item.name);
+    if(k){ utrByKey[k] = +item.utr; parsedCount++; }
+  });
+  let matched = 0;
+  players.forEach(p=>{
+    const hit = utrByKey[statsKey(p.name)];
+    if(hit!=null){ p.utr = hit; matched++; }
+    else { p.utr = null; }
+  });
+  statusEl.textContent = `${T().utrLoaded}: ${matched}/${players.length} (${parsedCount})`;
   renderList(); renderGrid(); renderResults();
 }
 function toggleInstr(){
@@ -610,12 +656,28 @@ function weightedWinRate(matches){
   const compressed = baseRate*(1-2*QUALITY_HEADROOM) + QUALITY_HEADROOM;
   return Math.max(0, Math.min(1, compressed + nudge));
 }
-function playerFactors(key, surface){
+// UTR (Universal Tennis Rating) updates from every match's actual score,
+// unlike ATP/WTA ranking which is a slower-moving 52-week points total —
+// blending it into rankScore (not adding it as its own MALAGA_WEIGHTS
+// factor) sharpens the rank signal without re-touching the weight balance
+// we've already tuned. Realistic range for TOUR-LEVEL players is roughly
+// 10-16.5, not the full 1-16.5 scale UTR uses across all rec/junior/college
+// players too — using the full scale would compress every pro into a tiny
+// high band and lose all differentiation.
+const UTR_MIN = 10.0, UTR_MAX = 16.5;
+const UTR_BLEND_WEIGHT = 0.5; // 0 = ignore UTR entirely, 1 = UTR fully replaces the ATP/WTA-rank score
+function utrStrength(utr){
+  if(utr==null || isNaN(utr)) return null;
+  return Math.max(0, Math.min(1, (utr-UTR_MIN)/(UTR_MAX-UTR_MIN)));
+}
+function playerFactors(key, surface, utr){
   if(!statsIndex) return null;
   const list = statsIndex[key];
   if(!list || !list.length) return null;
   const rank = list[0].rank;
-  const rankScore = rank ? Math.max(0, 1-(rank-1)/150) : 0.4;
+  const rankFromATP = rank ? Math.max(0, 1-(rank-1)/150) : 0.4;
+  const uStrength = utrStrength(utr);
+  const rankScore = uStrength!=null ? rankFromATP*(1-UTR_BLEND_WEIGHT) + uStrength*UTR_BLEND_WEIGHT : rankFromATP;
   const last10 = list.slice(0,10);
   const formScore = last10.length ? last10.filter(m=>m.win).length/last10.length : 0.5;
   const surfMatches = list.filter(m=>m.surface && surface && m.surface.toLowerCase()===surface.toLowerCase());
@@ -623,7 +685,7 @@ function playerFactors(key, surface){
   const winLossScore = weightedWinRate(list) ?? 0.5;
   const recentTiers = list.slice(0,10).map(m=>TIER_WEIGHTS[m.tier]??0.4);
   const tourneyScore = recentTiers.length ? recentTiers.reduce((a,b)=>a+b,0)/recentTiers.length : 0.4;
-  return {rankScore, formScore, surfaceScoreV, winLossScore, tourneyScore, rank};
+  return {rankScore, formScore, surfaceScoreV, winLossScore, tourneyScore, rank, rankFromATP, utrUsed: uStrength!=null};
 }
 function compositeScore(factors){
   if(!factors) return null;
@@ -638,7 +700,8 @@ function h2hScore(keyA, keyB){
 function pairWinProbability(nameA, nameB, surface){
   if(!statsIndex) return null;
   const keyA = resolveStatsKey(nameA), keyB = resolveStatsKey(nameB);
-  const fA = playerFactors(keyA, surface), fB = playerFactors(keyB, surface);
+  const pA = players.find(x=>x.name===nameA), pB = players.find(x=>x.name===nameB);
+  const fA = playerFactors(keyA, surface, pA?.utr), fB = playerFactors(keyB, surface, pB?.utr);
   if(!fA && !fB) return null;
   const baseA = compositeScore(fA) ?? 0.4;
   const baseB = compositeScore(fB) ?? 0.4;
@@ -846,7 +909,7 @@ function populateThresholdOptions(){
 }
 function playerPriority(p){
   if(statsIndex){
-    const f = playerFactors(resolveStatsKey(p.name), currentStatsSurface());
+    const f = playerFactors(resolveStatsKey(p.name), currentStatsSurface(), p.utr);
     const score = compositeScore(f);
     if(score!=null) return 100 - score*100;
   }
@@ -1253,11 +1316,12 @@ function startReplace(pos){
 function playerFactorsDebugText(p){
   if(!statsIndex) return T().statsNotLoaded;
   const key = resolveStatsKey(p.name);
-  const f = playerFactors(key, currentStatsSurface());
+  const f = playerFactors(key, currentStatsSurface(), p.utr);
   if(!f) return `${T().noData} (ключ: ${key})`;
   const score = compositeScore(f);
   const pct = v => (v*100).toFixed(0)+'%';
-  let text = `Рейтинг ${pct(f.rankScore)} (#${f.rank??'?'}) · Форма ${pct(f.formScore)} · Покрытие ${pct(f.surfaceScoreV)} · W/L ${pct(f.winLossScore)} · Турниры ${pct(f.tourneyScore)} · Итог ${pct(score)} · ключ: ${key}`;
+  const rankDetail = f.utrUsed ? ` (ATP/WTA ${pct(f.rankFromATP)} + UTR ${p.utr} → смешано)` : '';
+  let text = `Рейтинг ${pct(f.rankScore)}${rankDetail} (#${f.rank??'?'}) · Форма ${pct(f.formScore)} · Покрытие ${pct(f.surfaceScoreV)} · W/L ${pct(f.winLossScore)} · Турниры ${pct(f.tourneyScore)} · Итог ${pct(score)} · ключ: ${key}`;
   // H2H isn't part of compositeScore (it's pairwise, not a property of one
   // player), so it can't sit in the list above as a "7th factor" without
   // being misleading. Show it only against players actually in the current
