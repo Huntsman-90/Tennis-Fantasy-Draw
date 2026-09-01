@@ -41,6 +41,7 @@
   .quote{position:relative;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 36px 10px 10px;font-family:var(--mono);font-size:10.5px;margin:8px 0;color:var(--text)}
   .copybtn{position:absolute;top:8px;right:8px;background:var(--accent-dim);color:#0F1C24;border-radius:6px;padding:4px 7px;font-size:10px;font-weight:700}
   .counter{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12.5px;color:var(--muted)}
+  .counter b.over-budget{color:var(--warn)}
   .counter b{color:var(--accent);font-family:var(--mono)}
   .summary{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12.5px}
   .summary b{font-family:var(--mono)}
@@ -209,6 +210,7 @@
 <div class="card" id="selectCard" style="display:none">
   <h2 data-i18n="selection">Выбор девятки</h2>
   <div class="counter"><span data-i18n="selected">Выбрано</span><b id="selCount">0 / 9</b></div>
+  <div class="counter" id="budgetCounter" style="display:none"><span data-i18n="budgetUsedLabel">Бюджет</span><b id="budgetUsedText">0M</b></div>
   <div class="suggest-row">
     <select id="clashThreshold"></select>
     <button id="suggestBtnEl" onclick="suggestLineup()" data-i18n="suggestBtn">🎯 Подсказать состав</button>
@@ -310,7 +312,7 @@ const BASE = {
   tour:"Тур", statsStatus:"Статистика", statsNotLoaded:"Не загружена", statsLoading:"Загрузка статистики...",
   statsFailed:"Не удалось загрузить — используется базовый приоритет",statsKeyCollision:"Возможное совпадение ключей игроков — статистика могла объединиться",showMore:(n)=>`Показать ещё ${n}`,showLess:"Свернуть",reachChanceTitle:"Шанс, что эта встреча вообще состоится (оба должны дойти до этого этапа)", favShort:"фав.", dogShort:"андердог",
   fantasyPriceLabel:"Ссылка на турнир tennisfantasy.cc",fantasyLoadBtn:"💰 Загрузить цены",enterFantasyUrl:"Сначала вставь ссылку на турнир",fantasyLoading:"Загрузка цен...",fantasyFailed:"Не удалось загрузить цены — см. консоль/ответ сервера",fantasyLoaded:"Цены загружены",
-  budgetEnable:"Учитывать бюджет",budgetNoPrices:"Сначала загрузи цены fantasy",budgetPartial:(n,cost,excluded)=>`Подобрано ${n} из 9 в рамках бюджета (${cost}M потрачено). ${excluded?excluded+' игрок(ов) без цены исключены из подбора.':''}`,budgetSuccess:(cost,cap,roundLabel)=>`Готово: 9 игроков, ${cost}M из ${cap}M бюджета.${roundLabel?' Ближайший вынужденный перетин: '+roundLabel+'.':' Без перетинов раньше выбранного этапа.'}`,
+  budgetEnable:"Учитывать бюджет",budgetNoPrices:"Сначала загрузи цены fantasy",budgetPartial:(n,cost,excluded)=>`Подобрано ${n} из 9 в рамках бюджета (${cost}M потрачено). ${excluded?excluded+' игрок(ов) без цены исключены из подбора.':''}`,budgetSuccess:(cost,cap,roundLabel)=>`Готово: 9 игроков, ${cost}M из ${cap}M бюджета.${roundLabel?' Ближайший вынужденный перетин: '+roundLabel+'.':' Без перетинов раньше выбранного этапа.'}`,budgetUsedLabel:"Бюджет",budgetMissingPrice:"без цены",
   fantasyManualToggle:"Если автозагрузка не сработала — вставить вручную",fantasyManualLabel:"Цены (JSON: name + price, остальные поля не нужны)",fantasyManualImportBtn:"Импортировать цены вручную",fantasyManualParseError:"Не удалось разобрать JSON — проверь формат",fantasyManualSource:"вручную",
   utrLoadBtn:"📊 Загрузить UTR (Sofascore)",utrLoaded:"UTR загружен",utrManualToggle:"Если автозагрузка не сработала — вставить вручную",utrManualLabel:"UTR (JSON: name + utr, остальные поля не нужны)",utrManualImportBtn:"Импортировать UTR вручную"
 };
@@ -1436,9 +1438,29 @@ function jumpToPosition(){
     alert(T().notFound);
   }
 }
+// Shown live, not just in the one-shot alert after "Подсказать состав" —
+// updates on every selection change (renderList runs on all of them),
+// covers manual clicks too, not just the suggest algorithm's own picks.
+function updateBudgetCounter(){
+  const el = document.getElementById('budgetCounter');
+  if(!el) return;
+  const hasAnyPrice = players.some(p=>p.fantasyPrice!=null);
+  if(!hasAnyPrice){ el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  const selPlayers = selected.map(pos=>players.find(p=>p.pos===pos)).filter(Boolean);
+  const priced = selPlayers.filter(p=>p.fantasyPrice!=null);
+  const totalCost = priced.reduce((s,p)=>s+p.fantasyPrice,0);
+  const cap = +(document.getElementById('budgetCap')?.value || 100);
+  const missing = selPlayers.length - priced.length;
+  const missingNote = missing>0 ? ` (${missing} ${T().budgetMissingPrice})` : '';
+  const textEl = document.getElementById('budgetUsedText');
+  textEl.textContent = `${totalCost.toFixed(1)}M / ${cap}M${missingNote}`;
+  textEl.classList.toggle('over-budget', totalCost>cap);
+}
 function renderList(){
   const q = (document.getElementById('searchBox')?.value||'').toLowerCase();
   document.getElementById('selCount').textContent = selected.length+' / 9';
+  updateBudgetCounter();
   const list = document.getElementById('playerList');
   const sorted = [...players].sort((a,b)=>a.pos-b.pos);
   const baseSummary = computeSummary(selected);
