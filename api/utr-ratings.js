@@ -24,7 +24,15 @@ module.exports = async (req, res) => {
     }
 
     const upstream = await fetch(`https://www.sofascore.com/api/v1/rankings/${rankingId}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DrawClashChecker/1.0)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.sofascore.com/tennis/rankings/utr-men',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-dest': 'empty',
+      },
     });
     if (!upstream.ok) {
       res.status(502).json({ error: `Source unavailable (${upstream.status})`, id: rankingId });
