@@ -189,7 +189,7 @@
   <button class="btn-ghost" style="margin-top:8px" onclick="toggleUtrManual()"><span data-i18n="utrManualToggle">Если автозагрузка не сработала — вставить вручную</span><span id="utrManualArrow">▾</span></button>
   <div id="utrManualBody" style="display:none">
     <label style="margin-top:6px" data-i18n="utrManualLabel">UTR (JSON: name + utr, остальные поля не нужны)</label>
-    <textarea id="utrManualJson" placeholder='[{"name":"Carlos Alcaraz","utr":16.45}, ...]'></textarea>
+    <textarea id="utrManualJson" placeholder='Вставь как есть: [{"name":"...","utr":...}] или прямо ответ https://www.sofascore.com/api/v1/rankings/34'></textarea>
     <button class="btn-main" onclick="importUtrManual()" data-i18n="utrManualImportBtn">Импортировать UTR вручную</button>
   </div>
   <label style="margin-top:10px" data-i18n="drawSize">Размер сетки</label>
@@ -879,11 +879,23 @@ function importUtrManual(){
   const statusEl = document.getElementById('utrStatus');
   if(!statusEl) return;
   statusEl.style.display = 'block';
-  let raw;
+  let parsed;
   try{
-    raw = JSON.parse(document.getElementById('utrManualJson').value);
-    if(!Array.isArray(raw)) throw new Error('not an array');
+    parsed = JSON.parse(document.getElementById('utrManualJson').value);
   }catch(e){
+    statusEl.textContent = T().fantasyManualParseError;
+    return;
+  }
+  // Accepts either our own simplified [{name, utr}, ...] shape, or the raw
+  // Sofascore response pasted as-is (visiting /api/v1/rankings/34 directly
+  // in a browser is much easier than dev-tools network inspection) —
+  // {rankingRows:[{name, points, ...}, ...]}. No reformatting required.
+  let raw;
+  if(Array.isArray(parsed)){
+    raw = parsed.map(item=>({name:item?.name, utr:item?.utr}));
+  } else if(parsed && Array.isArray(parsed.rankingRows)){
+    raw = parsed.rankingRows.map(row=>({name:row?.name, utr:row?.points}));
+  } else {
     statusEl.textContent = T().fantasyManualParseError;
     return;
   }
