@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
       .map((r) => ({
         date: r.Date instanceof Date ? r.Date.toISOString().slice(0, 10) : (r.Date || null),
         tournament: r.Tournament || null,
-        tier: r.Series || null,
+        tier: r.Series || r.Tier || null,
         surface: r.Surface || null,
         round: r.Round || null,
         winner: r.Winner || null,

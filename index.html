@@ -583,7 +583,11 @@ function buildStatsIndex(matches){
   return idx;
 }
 const MALAGA_WEIGHTS = {rank:0.20, form:0.28, surface:0.18, h2h:0.07, winLoss:0.23, tourney:0.04};
-const TIER_WEIGHTS = {'Grand Slam':1,'Masters 1000':0.85,'ATP500':0.6,'ATP250':0.4,'International':0.3,'Premier':0.6,'Premier Mandatory':0.85,'Premier 5':0.75};
+const TIER_WEIGHTS = {
+  'Grand Slam':1,'Masters 1000':0.85,'ATP500':0.6,'ATP250':0.4, // ATP (Series column)
+  'WTA 1000':0.85,'WTA 500':0.6,'WTA 250':0.4,'WTA 125':0.3, // WTA current naming (post-2021 rebrand)
+  'Premier Mandatory':0.85,'Premier 5':0.75,'Premier':0.6,'International':0.3, // WTA pre-2021 naming — kept in case the archive's Tier column hasn't caught up
+};
 // formScore/tourneyScore already look at only the last 10 matches (list is
 // sorted newest-first in buildStatsIndex), so they stay recency-sensitive
 // regardless of how many seasons are pooled. surfaceScoreV and winLossScore
