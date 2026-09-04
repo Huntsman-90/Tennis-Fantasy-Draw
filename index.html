@@ -1161,16 +1161,7 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
   // Falls back to playerPriority when reach isn't available (non-power-of-
   // two draw sizes, where computeReachProbabilities returns null).
   const reach = computeReachProbabilities(players, drawSize(), currentStatsSurface());
-  // 1e-6 was way too coarse: winning 4-6 rounds in a row in a 128-draw is
-  // genuinely a small probability for MOST players, even strong ones (a
-  // real case: a #4-ranked player's reach-to-Final came out well under
-  // 1e-6). Everyone below that floor collapsed to the SAME clamped value,
-  // destroying the knapsack's ability to tell them apart -- it degenerated
-  // into picking almost by price alone (Андрей saw a 37.7M/100M team at
-  // the QF threshold). IEEE 754 doubles stay meaningfully distinct down to
-  // ~1e-300 before actually underflowing to literal 0, so this floor only
-  // needs to guard against log(0), not against realistic reach values.
-  const REACH_EPS = 1e-300;
+  const REACH_EPS = 1e-6;
   function candidateCost(p){
     if(reach && reach[p.pos] && reach[p.pos][thresholdIdx]!==undefined){
       return -Math.log(Math.max(reach[p.pos][thresholdIdx], REACH_EPS));
