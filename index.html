@@ -1143,33 +1143,8 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
     const gid = Math.ceil(p.pos/groupSize);
     (groupsMap[gid] = groupsMap[gid]||[]).push(p);
   });
-  // Value metric: probability of actually reaching this threshold round,
-  // not raw composite score. Андрей caught a real case where the knapsack
-  // dropped Sabalenka (#1, 15M, composite 74%) for Krejcikova (seed 27,
-  // 7.6M, composite 60%) who was structurally in the SAME bracket group —
-  // the math checks out under a LINEAR "quality points per dollar" metric
-  // (60/7.6=7.9 pts/M beats 74/15=4.9 pts/M), but that's the wrong metric:
-  // tournament advancement compounds round-over-round (winning N matches
-  // in a row is p^N, not p*N), so a player's REAL fantasy value scales
-  // faster than their composite score does. Reach probability already
-  // captures this correctly (it IS a product of round-win probabilities),
-  // so using -log(reach) as the per-candidate cost and letting the DP
-  // minimize the SUM is mathematically equivalent to maximizing the
-  // PRODUCT of reach probabilities across all 9 picks — properly
-  // reflecting that elite players are worth disproportionately more than
-  // their composite-score gap over a mid-tier alternative suggests.
-  // Falls back to playerPriority when reach isn't available (non-power-of-
-  // two draw sizes, where computeReachProbabilities returns null).
-  const reach = computeReachProbabilities(players, drawSize(), currentStatsSurface());
-  const REACH_EPS = 1e-6;
-  function candidateCost(p){
-    if(reach && reach[p.pos] && reach[p.pos][thresholdIdx]!==undefined){
-      return -Math.log(Math.max(reach[p.pos][thresholdIdx], REACH_EPS));
-    }
-    return playerPriority(p);
-  }
   const groups = Object.values(groupsMap).map(g =>
-    g.map(p => ({player:p, cost:candidateCost(p), priceUnits:Math.round(p.fantasyPrice*10)}))
+    g.map(p => ({player:p, priority:playerPriority(p), priceUnits:Math.round(p.fantasyPrice*10)}))
   );
   const BUDGET_UNITS = Math.round(budgetM*10);
   const MAXCOUNT = 9;
@@ -1202,7 +1177,7 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
   const overflowSlotsNeeded = Math.max(0, MAXCOUNT - groupsAvailable);
   let reserveUnits = 0;
   if(overflowSlotsNeeded>0){
-    const idealPerGroup = groups.map(cands => cands.reduce((best,c)=> c.cost<best.cost ? c : best).player);
+    const idealPerGroup = groups.map(cands => cands.reduce((best,c)=> c.priority<best.priority ? c : best).player);
     const idealFilled = fillToNineBudget(idealPerGroup, Infinity);
     const addedSlots = idealFilled.chosen.slice(idealPerGroup.length);
     reserveUnits = addedSlots.reduce((s,p)=> s + Math.round((p.fantasyPrice||0)*10), 0);
@@ -1220,7 +1195,7 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
         cands.forEach((c,ci)=>{
           const nb = b + c.priceUnits;
           if(nb>GROUP_PHASE_BUDGET) return;
-          const nv = dp[k][b] + c.cost;
+          const nv = dp[k][b] + c.priority;
           if(nv < ndp[k+1][nb]){ ndp[k+1][nb] = nv; choice[k+1][nb] = ci; }
         });
       }
