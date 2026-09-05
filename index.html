@@ -711,6 +711,62 @@ function currentStatsSurface(){
 // meeting probability is simply the product of their two reach values —
 // that's the whole trick.
 function isPowerOfTwo(n){ return n>0 && (n&(n-1))===0; }
+// TODO (planned, not yet implemented — see conversation for full context):
+// PLAN B for budget-mode value metric, deferred due to limits.
+//
+// History: budgetConstrainedLineup's knapsack originally valued candidates
+// by playerPriority (linear in composite score). Real bug found: under a
+// linear "quality points per dollar" metric, an elite/expensive player
+// (e.g. #1 seed Sabalenka, 15M) loses to a much cheaper mid-tier player
+// (e.g. seed 27, 7.6M) whenever their composite-score gap (say 14-19pp) is
+// smaller than their price ratio (~2x) -- mathematically correct FOR that
+// metric, but the metric itself is wrong: tournament advancement compounds
+// round-over-round (winning N matches in a row is p^N, not p*N), so an
+// elite player's true fantasy value scales faster than a linear composite
+// gap suggests. Confirmed structurally: Sabalenka and Krejcikova were in
+// the SAME bracket group at the R16 threshold, so this was a real
+// head-to-head substitution.
+//
+// First attempt (reverted, commits 07b1bd2 + 46f2b26, see git log): used
+// -log(reach[pos][thresholdIdx]) as the per-candidate cost instead of
+// playerPriority, computed via computeReachProbabilities() further below.
+// Minimizing sum(-log(p)) = maximizing product(p), which is the
+// mathematically correct way to combine independent round-survival
+// probabilities. This worked for the R16 case but broke down at deeper
+// thresholds (QF/SF/F): winning 4-6 rounds in a 128-draw is a genuinely
+// tiny probability for most players (even a real #4-ranked player's
+// reach-to-Final came out far below any reasonable epsilon floor), and
+// the LINEAR-space recursive multiplication inside computeReachProbabilities
+// (see below: `res[lp] = left[lp] * w`) underflows toward/to literal 0.0
+// in IEEE 754 doubles well before reaching the final round for most of a
+// 128-draw's players. Once many candidates all underflow to (or get
+// epsilon-clamped to) the same value, the knapsack loses all
+// differentiation and degenerates into picking near-randomly / by price
+// alone (observed: 37.7M and later 54.2M of a 100M budget spent, instead
+// of a sensible near-full spend on quality).
+//
+// PLAN B (not yet built): don't patch the epsilon from OUTSIDE again --
+// compute the recursion in LOG-SPACE from the start, so tiny-but-distinct
+// probabilities never collapse together:
+//   1. In solve(start, subSize) below, track log-probabilities instead of
+//      raw probabilities: logLeft[lp] = log(left[lp]), etc.
+//   2. The "win subtree" step is a PRODUCT (left[lp] * w) -> stays a SUM in
+//      log-space (logLeft[lp] + logW), numerically safe.
+//   3. The "sum over possible opponents" step (w = sum over rp of
+//      right[rp]*beat(p,q)) is a SUM of small terms -> needs the
+//      log-sum-exp trick to stay numerically stable: given terms
+//      t_i = logRight[rp] + log(beat(p,q)), compute
+//      logW = max(t_i) + log(sum(exp(t_i - max(t_i)))) rather than naively
+//      summing exp(t_i) directly (which reintroduces underflow/overflow).
+//   4. computeReachProbabilities()'s PUBLIC return value / UI badges
+//      should stay as real probabilities (exp() the log at the very end,
+//      only for display) -- only budgetConstrainedLineup's internal cost
+//      computation should consume the log-space values directly, since
+//      that's where the underflow-then-collapse actually caused harm.
+//   5. Test against the same real scenario that motivated this (Sabalenka/
+//      Krejcikova at R16) AND the QF/SF/F case that broke the first
+//      attempt (verify Gauff-caliber players stay distinguishable from
+//      weak/no-data players even when both round to "0%" for display).
 function computeReachProbabilities(playerList, size, surface){
   const byPos = {};
   playerList.forEach(p=>{ byPos[p.pos]=p; });
