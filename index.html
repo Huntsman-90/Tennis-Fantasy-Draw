@@ -711,62 +711,21 @@ function currentStatsSurface(){
 // meeting probability is simply the product of their two reach values —
 // that's the whole trick.
 function isPowerOfTwo(n){ return n>0 && (n&(n-1))===0; }
-// TODO (planned, not yet implemented — see conversation for full context):
-// PLAN B for budget-mode value metric, deferred due to limits.
-//
-// History: budgetConstrainedLineup's knapsack originally valued candidates
-// by playerPriority (linear in composite score). Real bug found: under a
-// linear "quality points per dollar" metric, an elite/expensive player
-// (e.g. #1 seed Sabalenka, 15M) loses to a much cheaper mid-tier player
-// (e.g. seed 27, 7.6M) whenever their composite-score gap (say 14-19pp) is
-// smaller than their price ratio (~2x) -- mathematically correct FOR that
-// metric, but the metric itself is wrong: tournament advancement compounds
-// round-over-round (winning N matches in a row is p^N, not p*N), so an
-// elite player's true fantasy value scales faster than a linear composite
-// gap suggests. Confirmed structurally: Sabalenka and Krejcikova were in
-// the SAME bracket group at the R16 threshold, so this was a real
-// head-to-head substitution.
-//
-// First attempt (reverted, commits 07b1bd2 + 46f2b26, see git log): used
-// -log(reach[pos][thresholdIdx]) as the per-candidate cost instead of
-// playerPriority, computed via computeReachProbabilities() further below.
-// Minimizing sum(-log(p)) = maximizing product(p), which is the
-// mathematically correct way to combine independent round-survival
-// probabilities. This worked for the R16 case but broke down at deeper
-// thresholds (QF/SF/F): winning 4-6 rounds in a 128-draw is a genuinely
-// tiny probability for most players (even a real #4-ranked player's
-// reach-to-Final came out far below any reasonable epsilon floor), and
-// the LINEAR-space recursive multiplication inside computeReachProbabilities
-// (see below: `res[lp] = left[lp] * w`) underflows toward/to literal 0.0
-// in IEEE 754 doubles well before reaching the final round for most of a
-// 128-draw's players. Once many candidates all underflow to (or get
-// epsilon-clamped to) the same value, the knapsack loses all
-// differentiation and degenerates into picking near-randomly / by price
-// alone (observed: 37.7M and later 54.2M of a 100M budget spent, instead
-// of a sensible near-full spend on quality).
-//
-// PLAN B (not yet built): don't patch the epsilon from OUTSIDE again --
-// compute the recursion in LOG-SPACE from the start, so tiny-but-distinct
-// probabilities never collapse together:
-//   1. In solve(start, subSize) below, track log-probabilities instead of
-//      raw probabilities: logLeft[lp] = log(left[lp]), etc.
-//   2. The "win subtree" step is a PRODUCT (left[lp] * w) -> stays a SUM in
-//      log-space (logLeft[lp] + logW), numerically safe.
-//   3. The "sum over possible opponents" step (w = sum over rp of
-//      right[rp]*beat(p,q)) is a SUM of small terms -> needs the
-//      log-sum-exp trick to stay numerically stable: given terms
-//      t_i = logRight[rp] + log(beat(p,q)), compute
-//      logW = max(t_i) + log(sum(exp(t_i - max(t_i)))) rather than naively
-//      summing exp(t_i) directly (which reintroduces underflow/overflow).
-//   4. computeReachProbabilities()'s PUBLIC return value / UI badges
-//      should stay as real probabilities (exp() the log at the very end,
-//      only for display) -- only budgetConstrainedLineup's internal cost
-//      computation should consume the log-space values directly, since
-//      that's where the underflow-then-collapse actually caused harm.
-//   5. Test against the same real scenario that motivated this (Sabalenka/
-//      Krejcikova at R16) AND the QF/SF/F case that broke the first
-//      attempt (verify Gauff-caliber players stay distinguishable from
-//      weak/no-data players even when both round to "0%" for display).
+// PLAN B: IMPLEMENTED (was a TODO, now done — see computeReachLogProbabilities
+// below and its use in budgetConstrainedLineup). History kept for context:
+// budgetConstrainedLineup's knapsack originally valued candidates via linear
+// playerPriority, which systematically undervalued elite/expensive players
+// (confirmed real case: #1 seed Sabalenka lost to a much cheaper seed-27
+// player who was structurally in the SAME bracket group at the R16
+// threshold — mathematically correct under a linear "points per dollar"
+// metric, but that metric is wrong since tournament advancement compounds
+// round-over-round). A first attempt (commits 07b1bd2/46f2b26, reverted by
+// eee55e2) used -log(reach) computed via the LINEAR-space function directly
+// below, which works at shallow rounds but underflows toward 0 for most
+// players by round 4-6 of a 128-draw, collapsing the knapsack's quality
+// signal entirely. Fixed properly this time by computing the recursion in
+// log-space from the start (see computeReachLogProbabilities, right after
+// this function) instead of patching an epsilon from outside.
 function computeReachProbabilities(playerList, size, surface){
   const byPos = {};
   playerList.forEach(p=>{ byPos[p.pos]=p; });
@@ -811,6 +770,80 @@ function computeReachProbabilities(playerList, size, surface){
   }
   solve(1, size);
   return reach;
+}
+// Log-space twin of computeReachProbabilities(), built specifically for the
+// budget knapsack (see Plan B note above budgetConstrainedLineup). The
+// probability-space version above is fine for UI display — a genuinely
+// tiny reach rounding to "0%" is an honest answer for a human reading a
+// badge. But when that SAME collapsed-to-zero value gets used as an
+// optimization target (minimizing -log(reach) in the knapsack), multiple
+// players underflowing to identical floating-point 0 in linear space
+// become mathematically indistinguishable, and the knapsack loses its
+// quality signal entirely — that's what broke in the reverted 07b1bd2/
+// 46f2b26 attempt. Doing the whole recursion in log-space from the start
+// keeps tiny-but-distinct probabilities distinguishable (log(1e-300) and
+// log(1e-350) are just very-negative-but-different finite numbers, never
+// literal underflow) all the way to round 6-7 of a 128-draw.
+//
+// Only the WIN-SUBTREE step is a simple sum in log-space (left+right are
+// independent, so P(win both)=P(left)*P(right) becomes logLeft+logRight).
+// The OPPONENT-SUM step (win prob = sum over possible opponents of
+// P(opponent wins their subtree) * P(beat that opponent)) is a genuine
+// sum of small terms and needs the log-sum-exp trick to stay stable:
+// naively summing exp(logTerm) for many very-negative logTerms would just
+// reintroduce the same underflow this function exists to avoid.
+function computeReachLogProbabilities(playerList, size, surface){
+  const byPos = {};
+  playerList.forEach(p=>{ byPos[p.pos]=p; });
+  if(!isPowerOfTwo(size)) return null;
+  const maxRound = Math.log2(size);
+  const logReach = {};
+  playerList.forEach(p=>{ logReach[p.pos] = new Array(maxRound+1).fill(-Infinity); logReach[p.pos][0]=0; }); // log(1)=0
+  const cache = new Map();
+  function logBeat(p,q){
+    const prob = pairWinProbability(p.name, q.name, surface);
+    const pr = prob===null ? 0.5 : prob;
+    return Math.log(Math.max(pr, 1e-300)); // guard log(0) if a beat-probability is ever exactly 0
+  }
+  function logSumExp(terms){
+    if(!terms.length) return -Infinity;
+    let m = -Infinity;
+    terms.forEach(t=>{ if(t>m) m=t; });
+    if(m===-Infinity) return -Infinity;
+    let s = 0;
+    terms.forEach(t=>{ s += Math.exp(t-m); });
+    return m + Math.log(s);
+  }
+  function solve(start, subSize){
+    const key = start+'_'+subSize;
+    if(cache.has(key)) return cache.get(key);
+    if(subSize===1){
+      const p = byPos[start];
+      const res = p ? {[start]:0} : {}; // log(1)=0
+      cache.set(key, res);
+      return res;
+    }
+    const half = subSize/2;
+    const left = solve(start, half);
+    const right = solve(start+half, half);
+    const res = {};
+    Object.keys(left).forEach(lp=>{
+      const p = byPos[lp];
+      const terms = Object.keys(right).map(rp=> right[rp] + logBeat(p, byPos[rp]));
+      res[lp] = left[lp] + logSumExp(terms);
+    });
+    Object.keys(right).forEach(rp=>{
+      const q = byPos[rp];
+      const terms = Object.keys(left).map(lp=> left[lp] + logBeat(q, byPos[lp]));
+      res[rp] = right[rp] + logSumExp(terms);
+    });
+    const roundIdx = Math.log2(subSize);
+    Object.keys(res).forEach(pos=>{ if(logReach[pos]) logReach[pos][roundIdx] = res[pos]; });
+    cache.set(key, res);
+    return res;
+  }
+  solve(1, size);
+  return logReach;
 }
 // Probability that posA and posB actually face each other at the round
 // where their sub-brackets merge (per meetRound). Requires both reach arrays
@@ -1199,8 +1232,36 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
     const gid = Math.ceil(p.pos/groupSize);
     (groupsMap[gid] = groupsMap[gid]||[]).push(p);
   });
+  // Value metric: probability of actually reaching this threshold round,
+  // not raw composite score (Plan B — see the log-space note above
+  // computeReachLogProbabilities). A real case motivated this: the
+  // knapsack dropped Sabalenka (#1, 15M, composite 74%) for Krejcikova
+  // (seed 27, 7.6M, composite 60%) who was structurally in the SAME
+  // bracket group — correct under a LINEAR "quality points per dollar"
+  // metric (60/7.6=7.9 pts/M beats 74/15=4.9 pts/M), but that metric is
+  // wrong: tournament advancement compounds round-over-round (winning N
+  // matches in a row is p^N, not p*N), so an elite player's real fantasy
+  // value scales faster than their composite-score gap suggests. Using
+  // -log(reach) as cost and letting the DP minimize the SUM is
+  // mathematically equivalent to maximizing the PRODUCT of reach
+  // probabilities — properly reflecting that compounding. Uses the
+  // log-space computation (not plain computeReachProbabilities) because
+  // winning 4-6 rounds in a 128-draw is a genuinely tiny probability for
+  // most players — even a top-4 player's real reach-to-Final underflowed
+  // toward 0 in linear-space arithmetic, collapsing every candidate to
+  // the same value and destroying the knapsack's quality signal entirely
+  // (the first, reverted attempt at this: commits 07b1bd2/46f2b26).
+  // Falls back to playerPriority when reach isn't available (non-power-of-
+  // two draw sizes, where computeReachLogProbabilities returns null).
+  const logReach = computeReachLogProbabilities(players, drawSize(), currentStatsSurface());
+  function candidateCost(p){
+    if(logReach && logReach[p.pos] && logReach[p.pos][thresholdIdx]!==undefined && logReach[p.pos][thresholdIdx]!==-Infinity){
+      return -logReach[p.pos][thresholdIdx];
+    }
+    return playerPriority(p);
+  }
   const groups = Object.values(groupsMap).map(g =>
-    g.map(p => ({player:p, priority:playerPriority(p), priceUnits:Math.round(p.fantasyPrice*10)}))
+    g.map(p => ({player:p, cost:candidateCost(p), priceUnits:Math.round(p.fantasyPrice*10)}))
   );
   const BUDGET_UNITS = Math.round(budgetM*10);
   const MAXCOUNT = 9;
@@ -1233,7 +1294,7 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
   const overflowSlotsNeeded = Math.max(0, MAXCOUNT - groupsAvailable);
   let reserveUnits = 0;
   if(overflowSlotsNeeded>0){
-    const idealPerGroup = groups.map(cands => cands.reduce((best,c)=> c.priority<best.priority ? c : best).player);
+    const idealPerGroup = groups.map(cands => cands.reduce((best,c)=> c.cost<best.cost ? c : best).player);
     const idealFilled = fillToNineBudget(idealPerGroup, Infinity);
     const addedSlots = idealFilled.chosen.slice(idealPerGroup.length);
     reserveUnits = addedSlots.reduce((s,p)=> s + Math.round((p.fantasyPrice||0)*10), 0);
@@ -1251,7 +1312,7 @@ function budgetConstrainedLineup(thresholdIdx, budgetM){
         cands.forEach((c,ci)=>{
           const nb = b + c.priceUnits;
           if(nb>GROUP_PHASE_BUDGET) return;
-          const nv = dp[k][b] + c.priority;
+          const nv = dp[k][b] + c.cost;
           if(nv < ndp[k+1][nb]){ ndp[k+1][nb] = nv; choice[k+1][nb] = ci; }
         });
       }
