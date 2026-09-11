@@ -221,6 +221,13 @@
     </label>
     <input id="budgetCap" type="number" value="100" min="1" step="0.1" style="width:70px" placeholder="100">
     <span style="font-size:11px;color:var(--muted)">M</span>
+    <select id="budgetPreset" onchange="applyBudgetPreset()" style="font-size:11px;flex:1">
+      <option value="">— категория турнира —</option>
+      <option value="60">250 (60M)</option>
+      <option value="75">500 (75M)</option>
+      <option value="100">1000 (100M)</option>
+      <option value="100">Grand Slam (100M)</option>
+    </select>
   </div>
   <div class="jumprow">
     <input id="jumpBox" type="number" data-i18n-ph="jumpPlaceholder" placeholder="Перейти к позиции №">
@@ -1580,6 +1587,17 @@ function jumpToPosition(){
 // Shown live, not just in the one-shot alert after "Подсказать состав" —
 // updates on every selection change (renderList runs on all of them),
 // covers manual clicks too, not just the suggest algorithm's own picks.
+// Same budget caps apply to both ATP and WTA (Андрей confirmed) — one
+// preset list covers both tours. Grand Slam and the 1000-level share the
+// same 100M cap but get separate menu entries since they're named
+// differently on the fantasy site.
+function applyBudgetPreset(){
+  const val = document.getElementById('budgetPreset')?.value;
+  if(!val) return;
+  const capEl = document.getElementById('budgetCap');
+  if(capEl){ capEl.value = val; }
+  updateBudgetCounter();
+}
 function updateBudgetCounter(){
   const el = document.getElementById('budgetCounter');
   if(!el) return;
